@@ -63,16 +63,16 @@ graph TD
 ### DB-1. schema.sql을 로컬 Postgres 인스턴스에 적용 및 기본 검증
 
 **완료 조건**
-- [ ] `psql -d <db> -f database/schema.sql`이 오류 없이 완료된다
-- [ ] `SELECT extname FROM pg_extension WHERE extname='pgcrypto';`로 pgcrypto 확장 설치 확인
-- [ ] 8개 테이블이 모두 존재함을 `\dt`/information_schema.tables로 확인
-- [ ] 모든 UNIQUE/CHECK 제약(`uq_users_email`, `ck_team_memberships_role`, `uq_team_memberships_team_user`, `uq_team_memberships_one_leader_per_team`, `uq_chats_schedule_id`, `ck_change_requests_status`)이 `\d <table>`에 존재함을 확인
-- [ ] 모든 인덱스(`ix_team_memberships_team_id/user_id`, `ix_schedules_team_id`, `ix_schedule_participants_schedule_id/user_id`, `ix_chat_messages_chat_id`, `ix_chat_messages_chat_id_created_at`, `ix_change_requests_schedule_id`)가 존재함을 확인
-- [ ] 8개 테이블 PK 모두에 `gen_random_uuid()` DEFAULT가 적용되어 있음을 확인
-- [ ] 재적용이 필요할 경우의 절차(스키마 초기화 후 재실행)가 기록된다
+- [x] `psql -d <db> -f database/schema.sql`이 오류 없이 완료된다
+- [x] `SELECT extname FROM pg_extension WHERE extname='pgcrypto';`로 pgcrypto 확장 설치 확인
+- [x] 8개 테이블이 모두 존재함을 `\dt`/information_schema.tables로 확인
+- [x] 모든 UNIQUE/CHECK 제약(`uq_users_email`, `ck_team_memberships_role`, `uq_team_memberships_team_user`, `uq_team_memberships_one_leader_per_team`, `uq_chats_schedule_id`, `ck_change_requests_status`)이 `\d <table>`에 존재함을 확인
+- [x] 모든 인덱스(`ix_team_memberships_team_id/user_id`, `ix_schedules_team_id`, `ix_schedule_participants_schedule_id/user_id`, `ix_chat_messages_chat_id`, `ix_chat_messages_chat_id_created_at`, `ix_change_requests_schedule_id`)가 존재함을 확인
+- [x] 8개 테이블 PK 모두에 `gen_random_uuid()` DEFAULT가 적용되어 있음을 확인
+- [x] 재적용이 필요할 경우의 절차(스키마 초기화 후 재실행)가 기록된다
 
 **의존성**
-- [ ] 없음 (최초 시작 태스크)
+- [x] 없음 (최초 시작 태스크)
 
 **예상 규모**: S
 
@@ -81,17 +81,17 @@ graph TD
 ### DB-2. 제약조건 및 카스케이드 동작 통합 검증
 
 **완료 조건**
-- [ ] 동일 team_id로 2번째 LEADER row INSERT 시 부분 유니크 인덱스 위반으로 실패 확인
-- [ ] 동일 team_id로 여러 MEMBER row INSERT는 정상 성공 확인
-- [ ] `schedules.deleted_at` UPDATE 전후로 연결된 chats/chat_messages row 수가 변하지 않음을 확인
-- [ ] 테스트 team을 `DELETE FROM teams`로 삭제 시 해당 팀의 schedules/schedule_participants/chats/chat_messages/change_requests가 모두 함께 삭제됨을 확인
-- [ ] 동일 schedule_id로 2번째 chats row INSERT 시 위반으로 실패 확인
-- [ ] `change_requests.status`→APPROVED + 대상 schedules 갱신을 단일 트랜잭션으로 실행 시 둘 다 커밋됨을 확인
-- [ ] 동일 트랜잭션 중 의도적 오류로 ROLLBACK 시 두 값 모두 이전 상태 유지 확인
-- [ ] 검증에 사용한 테스트 데이터는 종료 시 정리되어 잔여 데이터를 남기지 않는다
+- [x] 동일 team_id로 2번째 LEADER row INSERT 시 부분 유니크 인덱스 위반으로 실패 확인
+- [x] 동일 team_id로 여러 MEMBER row INSERT는 정상 성공 확인
+- [x] `schedules.deleted_at` UPDATE 전후로 연결된 chats/chat_messages row 수가 변하지 않음을 확인
+- [x] 테스트 team을 `DELETE FROM teams`로 삭제 시 해당 팀의 schedules/schedule_participants/chats/chat_messages/change_requests가 모두 함께 삭제됨을 확인
+- [x] 동일 schedule_id로 2번째 chats row INSERT 시 위반으로 실패 확인
+- [x] `change_requests.status`→APPROVED + 대상 schedules 갱신을 단일 트랜잭션으로 실행 시 둘 다 커밋됨을 확인
+- [x] 동일 트랜잭션 중 의도적 오류로 ROLLBACK 시 두 값 모두 이전 상태 유지 확인
+- [x] 검증에 사용한 테스트 데이터는 종료 시 정리되어 잔여 데이터를 남기지 않는다
 
 **의존성**
-- [ ] DB-1
+- [x] DB-1
 
 **예상 규모**: M
 
@@ -100,17 +100,17 @@ graph TD
 ### DB-3. 개발용 시드/픽스처 데이터셋 작성
 
 **완료 조건**
-- [ ] 시드 스크립트가 schema.sql 적용 직후 바로 실행 가능하다
-- [ ] 팀이 최소 2개 이상, 각 팀은 정확히 1명의 LEADER와 1명 이상의 MEMBER를 가진다
-- [ ] 하나의 팀에 과거(1년 이상 이전)/현재/미래(1년 이상 이후) 일정이 각각 최소 1건씩 존재한다
-- [ ] `deleted_at`이 채워진 schedules row가 최소 1건 존재한다
-- [ ] 삭제되지 않은 모든 schedules row는 정확히 1개의 chats row를 가진다
-- [ ] 최소 1개 일정의 chat_messages가 300건 이상 시간순으로 생성되어 있다
-- [ ] change_requests가 PENDING/APPROVED/REJECTED 각각 최소 1건씩, desired_start_at/end_at 모두 채워져 있다
-- [ ] 재실행 절차(정리 후 재적재 또는 안내 주석)가 문서화되어 있다
+- [x] 시드 스크립트가 schema.sql 적용 직후 바로 실행 가능하다
+- [x] 팀이 최소 2개 이상, 각 팀은 정확히 1명의 LEADER와 1명 이상의 MEMBER를 가진다
+- [x] 하나의 팀에 과거(1년 이상 이전)/현재/미래(1년 이상 이후) 일정이 각각 최소 1건씩 존재한다
+- [x] `deleted_at`이 채워진 schedules row가 최소 1건 존재한다
+- [x] 삭제되지 않은 모든 schedules row는 정확히 1개의 chats row를 가진다
+- [x] 최소 1개 일정의 chat_messages가 300건 이상 시간순으로 생성되어 있다
+- [x] change_requests가 PENDING/APPROVED/REJECTED 각각 최소 1건씩, desired_start_at/end_at 모두 채워져 있다
+- [x] 재실행 절차(정리 후 재적재 또는 안내 주석)가 문서화되어 있다
 
 **의존성**
-- [ ] DB-1
+- [x] DB-1
 
 **예상 규모**: M
 
@@ -121,13 +121,13 @@ graph TD
 **판단**: 정식 마이그레이션 프레임워크(Prisma Migrate 등)는 지금 도입하지 않는다 — ORM이 아직 미확정이고 CLAUDE.md의 오버엔지니어링 금지 원칙에 반한다. 기존 "단일 파일 + 상단 변경이력 표" 관행을 유지하되, 이미 적용된 환경에 증분 변경을 반영할 때는 변경이력 주석에 실행할 ALTER 문을 병기하는 최소 규칙만 확정한다.
 
 **완료 조건**
-- [ ] 프레임워크 미도입 판단과 근거(ORM 미결정, MVP 단일 환경, 오버엔지니어링 금지)가 명문화된다
-- [ ] "단일 파일 + 변경이력 표" 유지 결정과 증분 변경 절차(ALTER 문 병기)가 명문화된다
-- [ ] 재검토 트리거(ORM 확정 시점, 환경 2개 이상으로 증가하는 시점)가 명시된다
-- [ ] 결정 내용이 schema.sql의 "근거 문서" 섹션에 반영되어 CLAUDE.md의 과거 참조를 대체한다
+- [x] 프레임워크 미도입 판단과 근거(ORM 미결정, MVP 단일 환경, 오버엔지니어링 금지)가 명문화된다
+- [x] "단일 파일 + 변경이력 표" 유지 결정과 증분 변경 절차(ALTER 문 병기)가 명문화된다
+- [x] 재검토 트리거(ORM 확정 시점, 환경 2개 이상으로 증가하는 시점)가 명시된다
+- [x] 결정 내용이 schema.sql의 "근거 문서" 섹션에 반영되어 CLAUDE.md의 과거 참조를 대체한다
 
 **의존성**
-- [ ] 없음 (다만 스키마 변경이 다시 필요해지기 전에 끝내는 것이 바람직함)
+- [x] 없음 (다만 스키마 변경이 다시 필요해지기 전에 끝내는 것이 바람직함)
 
 **예상 규모**: S
 
@@ -136,16 +136,16 @@ graph TD
 ### DB-5. SC1 무제한 캘린더 조회 쿼리/인덱스 검증
 
 **완료 조건**
-- [ ] DB-3 시드 데이터 기준 `WHERE team_id=$1 AND deleted_at IS NULL ORDER BY start_at` 쿼리의 `EXPLAIN ANALYZE` 결과가 기록된다
-- [ ] `ix_schedules_team_id` 사용 여부(Index/Bitmap Scan) 또는 Seq Scan 여부가 확인·기록된다
-- [ ] deleted_at 필터가 Index Cond가 아닌 추가 Filter로 처리되는지 확인된다
-- [ ] 소프트 삭제된 일정이 결과에서 실제로 제외됨을 확인한다
-- [ ] 다른 팀의 일정이 결과에 섞이지 않음을 확인한다
-- [ ] 복합/부분 인덱스 추가 필요 여부 판단과 근거가 기록되며, 필요 시에만 후속 작업으로 분리한다(이번 작업에서 DDL 직접 변경 안 함)
+- [x] DB-3 시드 데이터 기준 `WHERE team_id=$1 AND deleted_at IS NULL ORDER BY start_at` 쿼리의 `EXPLAIN ANALYZE` 결과가 기록된다
+- [x] `ix_schedules_team_id` 사용 여부(Index/Bitmap Scan) 또는 Seq Scan 여부가 확인·기록된다
+- [x] deleted_at 필터가 Index Cond가 아닌 추가 Filter로 처리되는지 확인된다
+- [x] 소프트 삭제된 일정이 결과에서 실제로 제외됨을 확인한다
+- [x] 다른 팀의 일정이 결과에 섞이지 않음을 확인한다
+- [x] 복합/부분 인덱스 추가 필요 여부 판단과 근거가 기록되며, 필요 시에만 후속 작업으로 분리한다(이번 작업에서 DDL 직접 변경 안 함)
 
 **의존성**
-- [ ] DB-1
-- [ ] DB-3
+- [x] DB-1
+- [x] DB-3
 
 **예상 규모**: S
 
@@ -154,15 +154,15 @@ graph TD
 ### DB-6. UC8 채팅 이력 페이지네이션 쿼리/인덱스 검증
 
 **완료 조건**
-- [ ] schedule_id → chat_id 조회가 `uq_chats_schedule_id` 유니크 인덱스로 단일 row를 즉시 찾는지 확인된다
-- [ ] cursor 없는 첫 페이지 쿼리의 EXPLAIN ANALYZE에서 `ix_chat_messages_chat_id_created_at` 사용이 확인된다
-- [ ] cursor 있는 중간 페이지 쿼리에서도 동일 인덱스 사용이 확인된다
-- [ ] limit=50으로 300건을 순회했을 때 총 300건이 정확히 1회씩만 나타나며 순서가 유지됨을 확인한다
-- [ ] 동시각 메시지 존재 시 cursor 페이지네이션에서 행 누락/중복 위험이 있는지 확인하고, 발견되면 위험요소로 기록한다(tie-breaker 필요 여부 판단, DDL 변경은 범위 밖)
+- [x] schedule_id → chat_id 조회가 `uq_chats_schedule_id` 유니크 인덱스로 단일 row를 즉시 찾는지 확인된다
+- [x] cursor 없는 첫 페이지 쿼리의 EXPLAIN ANALYZE에서 `ix_chat_messages_chat_id_created_at` 사용이 확인된다
+- [x] cursor 있는 중간 페이지 쿼리에서도 동일 인덱스 사용이 확인된다
+- [x] limit=50으로 300건을 순회했을 때 총 300건이 정확히 1회씩만 나타나며 순서가 유지됨을 확인한다
+- [x] 동시각 메시지 존재 시 cursor 페이지네이션에서 행 누락/중복 위험이 있는지 확인하고, 발견되면 위험요소로 기록한다(tie-breaker 필요 여부 판단, DDL 변경은 범위 밖)
 
 **의존성**
-- [ ] DB-1
-- [ ] DB-3
+- [x] DB-1
+- [x] DB-3
 
 **예상 규모**: M
 
