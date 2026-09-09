@@ -45,6 +45,10 @@ Desktop.ini
 *.swp
 *.swo
 
+# Claude Code — 팀 공용 설정(.claude/settings.json, .claude/agents/)은 커밋하되,
+# 개인별 로컬 오버라이드(.claude/settings.local.json)는 제외한다.
+.claude/settings.local.json
+
 # Temporary files
 *.tmp
 *.temp
