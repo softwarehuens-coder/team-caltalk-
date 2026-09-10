@@ -10,8 +10,8 @@
   },
   "servers": [
     {
-      "url": "http://localhost:3000",
-      "description": "로컬 개발 서버 (placeholder)"
+      "url": "http://localhost:3001",
+      "description": "실제 백엔드 서버 (backend/src, PORT 환경변수, 기본값 3001). 이 서버가 /docs에서 이 문서 자체를 서빙한다."
     }
   ],
   "security": [
@@ -71,6 +71,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "409": {
             "description": "이미 등록된 이메일",
             "content": {
@@ -106,6 +107,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": {
             "description": "이메일 또는 비밀번호 불일치",
             "content": {
@@ -140,6 +142,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
@@ -170,6 +173,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -267,6 +271,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "409": {
@@ -311,7 +316,7 @@
       "get": {
         "tags": ["Schedules"],
         "summary": "팀 일정 조회 (월/주/일)",
-        "description": "BE-5, UC2/UC4, SC1. 소프트 삭제되지 않은(`deleted_at IS NULL`) 일정만 반환하며, 기간을 하드코딩으로 제한하지 않는다(과거/현재/미래 전체 조회 가능).",
+        "description": "BE-5, UC2/UC4, SC1. 소프트 삭제되지 않은(`deleted_at IS NULL`) 일정만 반환하며, 기간을 하드코딩으로 제한하지 않는다(과거/현재/미래 전체 조회 가능). `view`/`date`는 현재 구현(`list-team-schedules.usecase.ts`)에서 요청 형식 검증에만 사용되며, 조회 결과 자체는 필터링하지 않고 팀의 모든 활성 일정을 반환한다(SC1 불변조건).",
         "operationId": "listTeamSchedules",
         "parameters": [
           { "$ref": "#/components/parameters/TeamId" },
@@ -342,6 +347,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -350,7 +356,7 @@
       "post": {
         "tags": ["Schedules"],
         "summary": "일정 생성 (팀장 전용)",
-        "description": "BE-5, UC3. LEADER만 생성 가능(`canEditSchedule`). 생성과 동시에 대응하는 `chats` 행이 1개 자동 생성된다(BE-6 연동). `conflictWarnings`는 BE-10(Should, UC9/SC4) 구현 전까지 항상 빈 배열로 반환되는 스텁이다.",
+        "description": "BE-5, UC3. LEADER만 생성 가능(`canEditSchedule`). 생성과 동시에 대응하는 `chats` 행이 1개 자동 생성된다(BE-6 연동). BE-10(UC9/SC4)이 구현되어 있어 `conflictWarnings`는 겹치는 시간대에 동일 참여자가 있으면 실제 경고로 채워진다(`schedule-conflict.ts`) — 경고가 있어도 저장 자체는 차단되지 않는다.",
         "operationId": "createSchedule",
         "parameters": [
           { "$ref": "#/components/parameters/TeamId" }
@@ -372,6 +378,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -382,7 +389,7 @@
       "put": {
         "tags": ["Schedules"],
         "summary": "일정 수정 (팀장 전용)",
-        "description": "BE-5, UC3. LEADER만 수정 가능(`canEditSchedule`). `conflictWarnings`는 BE-10 이전까지 항상 빈 배열이다(UC9/SC4).",
+        "description": "BE-5, UC3. LEADER만 수정 가능(`canEditSchedule`). BE-10(UC9/SC4)이 구현되어 있어 `conflictWarnings`는 실제 경고로 채워지며(자기 자신은 비교 대상에서 제외), 경고가 있어도 저장은 차단되지 않는다.",
         "operationId": "updateSchedule",
         "parameters": [
           { "$ref": "#/components/parameters/TeamId" },
@@ -405,6 +412,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -459,6 +467,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -469,7 +478,7 @@
       "post": {
         "tags": ["ChangeRequests"],
         "summary": "일정 변경 요청 제출 (팀원, UC6)",
-        "description": "BE-7. 해당 일정의 참여자만 제출 가능(`canSubmitChangeRequest`, 비참여자는 403). 생성 시 `status=PENDING`으로 저장된다.",
+        "description": "BE-7. MEMBER 역할이면서 해당 일정의 참여자인 경우만 제출 가능(`canSubmitChangeRequest`가 MEMBER만 허용 + 참여자 목록 확인, 비참여자/팀장은 403). 생성 시 `status=PENDING`으로 저장된다.",
         "operationId": "submitChangeRequest",
         "parameters": [
           { "$ref": "#/components/parameters/ScheduleId" }
@@ -491,6 +500,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -555,6 +565,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
@@ -575,7 +586,7 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "BE-2 `auth.middleware.ts`가 검증하는 토큰. `/health`, `/auth/register`, `/auth/login`을 제외한 모든 엔드포인트에 필요하다. 구체적 토큰 형식(JWT vs 세션 등)은 6-tech-stack.md 6장에서 별도 문서로 미룬 세부 기술 설계 사항이라 이 스펙에서 확정하지 않는다."
+        "description": "BE-2 `auth.middleware.ts`가 검증하는 JWT(`jsonwebtoken`, 기본 HS256, 24시간 만료 — `infrastructure/auth/jwt-token.service.ts`). `POST /auth/login` 응답의 `token` 필드로 발급되며, `/health`, `/auth/register`, `/auth/login`을 제외한 모든 엔드포인트에 필요하다."
       }
     },
     "parameters": {
@@ -607,6 +618,14 @@
       }
     },
     "responses": {
+      "BadRequest": {
+        "description": "요청 형식이 올바르지 않음(필수 필드 누락, 타입 불일치 등). 각 라우트가 `presentation` 계층에서 직접 검증하며 `code: \"INVALID_REQUEST\"`로 응답한다.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
       "Unauthorized": {
         "description": "인증되지 않음(토큰 누락/무효)",
         "content": {
@@ -698,7 +717,7 @@
         "type": "object",
         "required": ["name"],
         "properties": {
-          "name": { "type": "string", "example": "디자인팀" }
+          "name": { "type": "string", "minLength": 1, "example": "디자인팀" }
         }
       },
       "InviteTeamMemberRequest": {
@@ -833,7 +852,7 @@
       },
       "ScheduleCreateResponse": {
         "type": "object",
-        "description": "일정 생성/수정 응답 공통 형태. conflictWarnings는 BE-10(UC9/SC4) 구현 전까지 항상 빈 배열이다(저장 자체는 차단되지 않음).",
+        "description": "일정 생성/수정 응답 공통 형태. conflictWarnings는 BE-10(UC9/SC4, schedule-conflict.ts)의 실제 판정 결과이며, 경고가 있어도 저장 자체는 차단되지 않는다.",
         "required": ["schedule", "conflictWarnings"],
         "properties": {
           "schedule": { "$ref": "#/components/schemas/Schedule" },
