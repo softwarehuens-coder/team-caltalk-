@@ -11,6 +11,7 @@ import { groupSchedulesByDay } from '../utils/schedule-period.util';
 import { AgendaListView } from './AgendaListView';
 import { CalendarToolbar } from './CalendarToolbar';
 import { MonthGrid } from './MonthGrid';
+import { ScheduleForm } from './ScheduleForm';
 
 export interface CalendarViewProps {
   onScheduleClick?(schedule: Schedule): void;
@@ -25,9 +26,12 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
     schedules,
     isLoading: isSchedulesLoading,
     error: schedulesError,
+    refresh,
   } = useTeamSchedules(team?.id ?? null, view, dateParam);
 
   const [, setSelectedScheduleId] = useState<string | null>(null);
+  const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
 
   const days = useMemo(() => {
     if (view === 'month') {
@@ -47,6 +51,32 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
   const handleScheduleClick = (schedule: Schedule): void => {
     setSelectedScheduleId(schedule.id);
     onScheduleClick?.(schedule);
+    if (isLeader) {
+      setFormMode('edit');
+      setEditingSchedule(schedule);
+    }
+  };
+
+  const handleCreateClick = (): void => {
+    setFormMode('create');
+    setEditingSchedule(null);
+  };
+
+  const handleFormSaved = (): void => {
+    void refresh();
+    setFormMode(null);
+    setEditingSchedule(null);
+  };
+
+  const handleFormDeleted = (): void => {
+    void refresh();
+    setFormMode(null);
+    setEditingSchedule(null);
+  };
+
+  const handleFormClose = (): void => {
+    setFormMode(null);
+    setEditingSchedule(null);
   };
 
   const header = (
@@ -108,6 +138,7 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
           onNext={goNext}
           onToday={goToday}
           isLeader={isLeader}
+          onCreateClick={handleCreateClick}
         />
         {isSchedulesLoading && <p className="text-xs text-gray-400">불러오는 중...</p>}
         {view === 'month' ? (
@@ -121,6 +152,21 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
           <AgendaListView days={days} schedulesByDay={schedulesByDay} onScheduleClick={handleScheduleClick} />
         )}
       </div>
+      {formMode && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+            <ScheduleForm
+              teamId={team.id}
+              members={members}
+              mode={formMode}
+              schedule={editingSchedule}
+              onSaved={handleFormSaved}
+              onDeleted={handleFormDeleted}
+              onCancel={handleFormClose}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

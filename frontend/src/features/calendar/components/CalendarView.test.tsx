@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../../shared/api/api-error';
 import type { Schedule } from '../../../shared/types/schedule.types';
@@ -33,18 +34,26 @@ vi.mock('../hooks/use-team-schedules', () => ({
 }));
 
 vi.mock('./CalendarToolbar', () => ({
-  CalendarToolbar: (props: { view: string; isLeader: boolean }) => (
-    <div data-testid="toolbar" data-view={props.view} data-leader={String(props.isLeader)} />
+  CalendarToolbar: (props: { view: string; isLeader: boolean; onCreateClick?: () => void }) => (
+    <div data-testid="toolbar" data-view={props.view} data-leader={String(props.isLeader)}>
+      {props.isLeader && (
+        <button type="button" onClick={props.onCreateClick}>
+          생성
+        </button>
+      )}
+    </div>
   ),
 }));
 
 vi.mock('./MonthGrid', () => ({
-  MonthGrid: (props: { schedulesByDay: Map<string, Schedule[]> }) => (
+  MonthGrid: (props: { schedulesByDay: Map<string, Schedule[]>; onScheduleClick(schedule: Schedule): void }) => (
     <div data-testid="month-grid">
       {Array.from(props.schedulesByDay.values())
         .flat()
         .map((schedule) => (
-          <span key={schedule.id}>{schedule.title}</span>
+          <button key={schedule.id} type="button" onClick={() => props.onScheduleClick(schedule)}>
+            {schedule.title}
+          </button>
         ))}
     </div>
   ),
@@ -52,6 +61,46 @@ vi.mock('./MonthGrid', () => ({
 
 vi.mock('./AgendaListView', () => ({
   AgendaListView: () => <div data-testid="agenda-view" />,
+}));
+
+vi.mock('./ScheduleForm', () => ({
+  ScheduleForm: (props: {
+    teamId: string;
+    mode: 'create' | 'edit';
+    schedule?: Schedule | null;
+    onSaved(schedule: Schedule): void;
+    onDeleted?(scheduleId: string): void;
+    onCancel(): void;
+  }) => (
+    <div data-testid="schedule-form" data-mode={props.mode} data-schedule-id={props.schedule ? props.schedule.id : ''}>
+      <button
+        type="button"
+        onClick={() =>
+          props.onSaved({
+            id: props.schedule ? props.schedule.id : 'new-id',
+            teamId: props.teamId,
+            title: '저장됨',
+            startAt: '2026-04-15T00:00:00.000Z',
+            endAt: '2026-04-15T01:00:00.000Z',
+            createdAt: '2026-04-01T00:00:00.000Z',
+            deletedAt: null,
+            participants: [],
+          })
+        }
+      >
+        저장
+      </button>
+      <button
+        type="button"
+        onClick={() => props.onDeleted && props.onDeleted(props.schedule ? props.schedule.id : '')}
+      >
+        삭제
+      </button>
+      <button type="button" onClick={() => props.onCancel()}>
+        취소
+      </button>
+    </div>
+  ),
 }));
 
 import { CalendarView } from './CalendarView';
@@ -88,11 +137,13 @@ function buildSchedule(id: string, title: string, overrides: Partial<Schedule> =
 }
 
 function setupDefaults() {
+  const refresh = vi.fn();
   useAuthMock.mockReturnValue({ user: authUser, token: 't', status: 'authenticated', login: vi.fn(), logout: vi.fn() });
   useCurrentTeamMock.mockReturnValue({ team: { id: 't1', name: '프론트팀' }, setTeam: vi.fn(), clearTeam: vi.fn() });
   useTeamMembersMock.mockReturnValue({ members: [leaderMember()], isLoading: false, error: null, refresh: vi.fn() });
   useCalendarNavigationMock.mockReturnValue(defaultNav);
-  useTeamSchedulesMock.mockReturnValue({ schedules: [], isLoading: false, error: null, refresh: vi.fn() });
+  useTeamSchedulesMock.mockReturnValue({ schedules: [], isLoading: false, error: null, refresh });
+  return { refresh };
 }
 
 function renderView() {
@@ -199,5 +250,93 @@ describe('CalendarView', () => {
 
     expect(screen.queryByText('삭제된 일정')).not.toBeInTheDocument();
     expect(screen.getByText('정상 일정')).toBeInTheDocument();
+  });
+
+  it('LEADER가 생성 버튼을 클릭하면 mode=create로 ScheduleForm을 렌더링한다', async () => {
+    const user = userEvent.setup();
+    setupDefaults();
+    renderView();
+
+    expect(screen.queryByTestId('schedule-form')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '생성' }));
+
+    expect(screen.getByTestId('schedule-form')).toHaveAttribute('data-mode', 'create');
+  });
+
+  it('LEADER가 일정을 클릭하면 mode=edit이고 해당 일정으로 ScheduleForm을 렌더링한다', async () => {
+    const user = userEvent.setup();
+    setupDefaults();
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+
+    renderView();
+
+    await user.click(screen.getByRole('button', { name: '주간 회의' }));
+
+    const form = screen.getByTestId('schedule-form');
+    expect(form).toHaveAttribute('data-mode', 'edit');
+    expect(form).toHaveAttribute('data-schedule-id', 's1');
+  });
+
+  it('MEMBER는 일정을 클릭해도 ScheduleForm이 열리지 않는다', async () => {
+    const user = userEvent.setup();
+    setupDefaults();
+    useTeamMembersMock.mockReturnValue({ members: [leaderMember('MEMBER')], isLoading: false, error: null, refresh: vi.fn() });
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+
+    renderView();
+
+    await user.click(screen.getByRole('button', { name: '주간 회의' }));
+
+    expect(screen.queryByTestId('schedule-form')).not.toBeInTheDocument();
+  });
+
+  it('ScheduleForm의 onSaved가 호출되면 refresh를 호출하고 폼을 닫는다', async () => {
+    const user = userEvent.setup();
+    const { refresh } = setupDefaults();
+    renderView();
+
+    await user.click(screen.getByRole('button', { name: '생성' }));
+    expect(screen.getByTestId('schedule-form')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled();
+    });
+    expect(screen.queryByTestId('schedule-form')).not.toBeInTheDocument();
+  });
+
+  it('ScheduleForm의 onDeleted가 호출되면 refresh를 호출하고 폼을 닫는다', async () => {
+    const user = userEvent.setup();
+    const { refresh } = setupDefaults();
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh });
+
+    renderView();
+
+    await user.click(screen.getByRole('button', { name: '주간 회의' }));
+    expect(screen.getByTestId('schedule-form')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '삭제' }));
+
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled();
+    });
+    expect(screen.queryByTestId('schedule-form')).not.toBeInTheDocument();
+  });
+
+  it('ScheduleForm의 onCancel이 호출되면 refresh 없이 폼만 닫힌다', async () => {
+    const user = userEvent.setup();
+    const { refresh } = setupDefaults();
+    renderView();
+
+    await user.click(screen.getByRole('button', { name: '생성' }));
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByTestId('schedule-form')).not.toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
