@@ -14,6 +14,7 @@ export default defineConfig({
       include: [
         'src/shared/api/**/*.ts',
         'src/features/auth/**/*.{ts,tsx}',
+        'src/features/team/**/*.{ts,tsx}',
         'src/app/**/*.{ts,tsx}',
       ],
       exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts'],
