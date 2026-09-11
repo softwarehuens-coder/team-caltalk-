@@ -1,7 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { loginUser } from '../../features/auth/api/auth.api';
 import { setUnauthorizedHandler } from '../../shared/api/http-client';
-import { clearAuthToken, getAuthToken, setAuthToken } from '../../shared/api/token-storage';
+import {
+  clearAuthToken,
+  clearAuthUser,
+  getAuthToken,
+  getAuthUser,
+  setAuthToken,
+  setAuthUser,
+} from '../../shared/api/token-storage';
 import type { LoginRequest, User } from '../../shared/types/auth.types';
 import { AuthContext, type AuthContextValue, type AuthStatus } from './auth-context';
 
@@ -12,13 +19,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const existingToken = getAuthToken();
+    const existingUser = getAuthUser();
     setToken(existingToken);
+    setUser(existingUser);
     setStatus(existingToken ? 'authenticated' : 'unauthenticated');
   }, []);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setUser(null);
+      clearAuthUser();
       setToken(null);
       setStatus('unauthenticated');
     });
@@ -27,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (payload: LoginRequest): Promise<void> => {
     const response = await loginUser(payload);
     setAuthToken(response.token);
+    setAuthUser(response.user);
     setUser(response.user);
     setToken(response.token);
     setStatus('authenticated');
@@ -34,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = (): void => {
     clearAuthToken();
+    clearAuthUser();
     setUser(null);
     setToken(null);
     setStatus('unauthenticated');

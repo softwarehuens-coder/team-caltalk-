@@ -10,6 +10,9 @@ vi.mock('../../shared/api/token-storage', () => ({
   getAuthToken: vi.fn(),
   setAuthToken: vi.fn(),
   clearAuthToken: vi.fn(),
+  getAuthUser: vi.fn(),
+  setAuthUser: vi.fn(),
+  clearAuthUser: vi.fn(),
 }));
 
 vi.mock('../../shared/api/http-client', () => ({
@@ -56,6 +59,7 @@ function renderProvider() {
 describe('AuthProvider', () => {
   beforeEach(() => {
     vi.mocked(tokenStorage.getAuthToken).mockReturnValue(null);
+    vi.mocked(tokenStorage.getAuthUser).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -137,5 +141,58 @@ describe('AuthProvider', () => {
     });
 
     expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated');
+  });
+
+  it('마운트 시 getAuthUser로 저장된 사용자 정보를 복원한다', () => {
+    vi.mocked(tokenStorage.getAuthToken).mockReturnValue('stored-token');
+    vi.mocked(tokenStorage.getAuthUser).mockReturnValue({
+      id: 'u1',
+      email: 'restored@test.com',
+      name: '홍길동',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    renderProvider();
+
+    expect(screen.getByTestId('user-email')).toHaveTextContent('restored@test.com');
+  });
+
+  it('login 성공 시 setAuthUser를 응답받은 사용자 정보로 호출한다', async () => {
+    const user = userEvent.setup();
+    const response: LoginResponse = {
+      token: 'new-token',
+      user: { id: 'u1', email: 'user@test.com', name: '홍길동', createdAt: '2026-01-01T00:00:00.000Z' },
+    };
+    vi.mocked(authApi.loginUser).mockResolvedValue(response);
+
+    renderProvider();
+    await user.click(screen.getByText('login'));
+
+    await waitFor(() => {
+      expect(tokenStorage.setAuthUser).toHaveBeenCalledWith(response.user);
+    });
+  });
+
+  it('logout 호출 시 clearAuthUser를 호출한다', async () => {
+    const user = userEvent.setup();
+    vi.mocked(tokenStorage.getAuthToken).mockReturnValue('stored-token');
+
+    renderProvider();
+    await user.click(screen.getByText('logout'));
+
+    expect(tokenStorage.clearAuthUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('401 unauthorized 핸들러가 호출되면 clearAuthUser를 호출한다', () => {
+    vi.mocked(tokenStorage.getAuthToken).mockReturnValue('stored-token');
+
+    renderProvider();
+
+    const registeredHandler = vi.mocked(httpClient.setUnauthorizedHandler).mock.calls[0][0];
+    act(() => {
+      registeredHandler();
+    });
+
+    expect(tokenStorage.clearAuthUser).toHaveBeenCalledTimes(1);
   });
 });

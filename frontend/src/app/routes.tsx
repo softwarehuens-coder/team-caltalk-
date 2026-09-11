@@ -1,29 +1,8 @@
-import { Link, Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthPage } from '../features/auth/components/AuthPage';
-import { useAuth } from '../features/auth/hooks/use-auth';
+import { CalendarView } from '../features/calendar/components/CalendarView';
 import { TeamPage } from '../features/team/components/TeamPage';
 import { RequireAuth } from './providers/RequireAuth';
-
-// FE-3에서 실제 캘린더 화면으로 교체될 임시 홈 플레이스홀더.
-function HomePlaceholder() {
-  const { logout } = useAuth();
-
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-      <h1 className="text-lg font-bold text-gray-900">Team CalTalk 홈</h1>
-      <Link to="/team" className="text-primary-600 hover:text-primary-700">
-        팀 관리
-      </Link>
-      <button
-        type="button"
-        onClick={logout}
-        className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-      >
-        로그아웃
-      </button>
-    </div>
-  );
-}
 
 export function AppRoutes() {
   return (
@@ -34,7 +13,7 @@ export function AppRoutes() {
         path="/"
         element={
           <RequireAuth>
-            <HomePlaceholder />
+            <CalendarView />
           </RequireAuth>
         }
       />
