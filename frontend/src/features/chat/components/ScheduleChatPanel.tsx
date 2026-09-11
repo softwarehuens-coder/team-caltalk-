@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useAuth } from '../../auth/hooks/use-auth';
 import type { ChatMessage } from '../../../shared/types/chat.types';
 import type { Schedule } from '../../../shared/types/schedule.types';
 import type { TeamMember } from '../../../shared/types/team.types';
 import { useChatSocket, type ChatConnectionStatus } from '../hooks/use-chat-socket';
+import { getScheduleMessages } from '../api/chat.api';
+import { ApiError } from '../../../shared/api/api-error';
 
 export interface ScheduleChatPanelProps {
   schedule: Schedule;
@@ -21,6 +23,24 @@ function formatDateTime(value: string): string {
 
 function formatTime(value: string): string {
   return new Date(value).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function mergeById(a: ChatMessage[], b: ChatMessage[]): ChatMessage[] {
+  const map = new Map<string, ChatMessage>();
+  [...a, ...b].forEach((m) => map.set(m.id, m));
+  return Array.from(map.values()).sort(
+    (x, y) => new Date(x.createdAt).getTime() - new Date(y.createdAt).getTime(),
+  );
+}
+
+function getHistoryErrorMessage(error: ApiError): string {
+  if (error.status === 403) {
+    return '이 팀의 채팅에 접근할 권한이 없습니다';
+  }
+  if (error.status === 404) {
+    return '채팅 이력을 찾을 수 없습니다(팀이 삭제되었을 수 있습니다)';
+  }
+  return '채팅 이력을 불러오지 못했습니다';
 }
 
 function StatusBadge({ status, onReLogin }: { status: ChatConnectionStatus; onReLogin(): void }) {
@@ -57,24 +77,81 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
   const { token, logout } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [content, setContent] = useState('');
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [historyError, setHistoryError] = useState<ApiError | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isPrependingRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
 
   useEffect(() => {
+    let cancelled = false;
     setMessages([]);
+    setNextCursor(null);
+    setHasMore(false);
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+    getScheduleMessages(schedule.id)
+      .then((result) => {
+        if (cancelled) return;
+        setMessages((prev) => mergeById(result.data, prev));
+        setNextCursor(result.nextCursor);
+        setHasMore(result.hasMore);
+        setIsLoadingHistory(false);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setHistoryError(error instanceof ApiError ? error : new ApiError(0, 'UNKNOWN', '채팅 이력을 불러오지 못했습니다.'));
+        setIsLoadingHistory(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [schedule.id]);
 
   const { status, sendMessage } = useChatSocket({
     scheduleId: schedule.id,
     token,
-    onMessage: (message) => setMessages((prev) => [...prev, message]),
+    onMessage: (message) =>
+      setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message])),
   });
 
   useEffect(() => {
+    if (isPrependingRef.current) return;
     const container = scrollContainerRef.current;
     if (container) {
       container.scrollTop = container.scrollHeight;
     }
   }, [messages]);
+
+  useLayoutEffect(() => {
+    if (!isPrependingRef.current) return;
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight - prevScrollHeightRef.current;
+    }
+    isPrependingRef.current = false;
+  }, [messages]);
+
+  const handleLoadMore = (): void => {
+    if (isLoadingMore || !nextCursor) return;
+    isPrependingRef.current = true;
+    prevScrollHeightRef.current = scrollContainerRef.current?.scrollHeight ?? 0;
+    setIsLoadingMore(true);
+    getScheduleMessages(schedule.id, { cursor: nextCursor })
+      .then((result) => {
+        setMessages((prev) => mergeById(result.data, prev));
+        setNextCursor(result.nextCursor);
+        setHasMore(result.hasMore);
+        setIsLoadingMore(false);
+      })
+      .catch(() => {
+        isPrependingRef.current = false;
+        setIsLoadingMore(false);
+      });
+  };
 
   const participantNames = schedule.participants
     .map((participant) => members.find((member) => member.userId === participant.userId)?.name ?? participant.userId)
@@ -137,23 +214,41 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
             <StatusBadge status={status} onReLogin={logout} />
           </div>
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-3">
-            {messages.length === 0 ? (
+            {isLoadingHistory ? (
+              <p className="text-sm text-gray-400">채팅 이력을 불러오는 중입니다..</p>
+            ) : historyError ? (
+              <p className="text-sm text-red-500">{getHistoryErrorMessage(historyError)}</p>
+            ) : messages.length === 0 ? (
               <p className="text-sm text-gray-400">아직 메시지가 없습니다</p>
             ) : (
-              <ul className="flex flex-col gap-3">
-                {messages.map((message) => {
-                  const senderName = members.find((member) => member.userId === message.senderUserId)?.name ?? '알 수 없음';
-                  return (
-                    <li key={message.id} className="text-sm text-gray-700">
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-medium text-gray-900">{senderName}</span>
-                        <span className="text-xs text-gray-400">{formatTime(message.createdAt)}</span>
-                      </div>
-                      <p className="whitespace-pre-wrap">{message.content}</p>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                {hasMore && (
+                  <div className="mb-3 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={handleLoadMore}
+                      disabled={isLoadingMore}
+                      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isLoadingMore ? '불러오는 중...' : '이전 메시지 더 보기'}
+                    </button>
+                  </div>
+                )}
+                <ul className="flex flex-col gap-3">
+                  {messages.map((message) => {
+                    const senderName = members.find((member) => member.userId === message.senderUserId)?.name ?? '알 수 없음';
+                    return (
+                      <li key={message.id} className="text-sm text-gray-700">
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-medium text-gray-900">{senderName}</span>
+                          <span className="text-xs text-gray-400">{formatTime(message.createdAt)}</span>
+                        </div>
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             )}
           </div>
           <div className="flex flex-col gap-2 border-t border-gray-200 p-3">
@@ -161,7 +256,7 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
               value={content}
               onChange={(event) => setContent(event.target.value.slice(0, MAX_MESSAGE_LENGTH))}
               onKeyDown={handleKeyDown}
-              disabled={status !== 'open'}
+              disabled={status !== 'open' || Boolean(historyError)}
               rows={3}
               className="resize-none rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none disabled:bg-gray-100"
             />
@@ -172,7 +267,7 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={status !== 'open'}
+                disabled={status !== 'open' || Boolean(historyError)}
                 className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 전송
