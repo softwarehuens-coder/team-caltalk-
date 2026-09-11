@@ -7,10 +7,15 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/shared/api/**/*.ts'],
+      include: [
+        'src/shared/api/**/*.ts',
+        'src/features/auth/**/*.{ts,tsx}',
+        'src/app/**/*.{ts,tsx}',
+      ],
       exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts'],
       thresholds: {
         lines: 80,
