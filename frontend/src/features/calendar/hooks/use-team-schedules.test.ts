@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { ApiError } from '../../../shared/api/api-error';
 import type { Schedule } from '../../../shared/types/schedule.types';
+import type { CalendarViewMode } from '../types/calendar-view.types';
 
 const getTeamSchedulesMock = vi.fn();
 
@@ -71,14 +72,14 @@ describe('useTeamSchedules', () => {
 
     const { rerender } = renderHook(
       ({ view, date }) => useTeamSchedules('t1', view, date),
-      { initialProps: { view: 'month' as const, date: '2026-04-15' } },
+      { initialProps: { view: 'month' as CalendarViewMode, date: '2026-04-15' } },
     );
 
     await waitFor(() => {
       expect(getTeamSchedulesMock).toHaveBeenCalledTimes(1);
     });
 
-    rerender({ view: 'week' as const, date: '2026-04-12' });
+    rerender({ view: 'week' as CalendarViewMode, date: '2026-04-12' });
 
     await waitFor(() => {
       expect(getTeamSchedulesMock).toHaveBeenCalledTimes(2);

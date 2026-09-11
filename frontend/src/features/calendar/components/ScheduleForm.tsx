@@ -1,16 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { ApiError } from '../../../shared/api/api-error';
-import type { Schedule } from '../../../shared/types/schedule.types';
+import type { Schedule, ScheduleConflictWarning } from '../../../shared/types/schedule.types';
 import type { TeamMember } from '../../../shared/types/team.types';
 import { createSchedule, deleteSchedule, updateSchedule } from '../api/schedule.api';
 import { toDatetimeLocalInput, toIsoString } from '../utils/schedule-datetime.util';
+import { ScheduleConflictBanner } from './ScheduleConflictBanner';
 
 export interface ScheduleFormProps {
   teamId: string;
   members: TeamMember[];
   mode: 'create' | 'edit';
   schedule?: Schedule | null;
-  onSaved(schedule: Schedule): void;
+  onSaved(schedule: Schedule, hasConflicts?: boolean): void;
   onDeleted?(scheduleId: string): void;
   onCancel(): void;
 }
@@ -32,6 +33,7 @@ export function ScheduleForm({ teamId, members, mode, schedule, onSaved, onDelet
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [conflictWarnings, setConflictWarnings] = useState<ScheduleConflictWarning[]>([]);
 
   const toggleParticipant = (userId: string): void => {
     setParticipantUserIds((current) =>
@@ -81,7 +83,10 @@ export function ScheduleForm({ teamId, members, mode, schedule, onSaved, onDelet
         mode === 'create'
           ? await createSchedule(teamId, body)
           : await updateSchedule(teamId, schedule!.id, body);
-      onSaved(response.schedule);
+      
+      const warnings = response.conflictWarnings ?? [];
+      setConflictWarnings(warnings);
+      onSaved(response.schedule, warnings.length > 0);
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
         setSubmitError('팀장만 일정을 생성/수정할 수 있습니다');
@@ -123,6 +128,8 @@ export function ScheduleForm({ teamId, members, mode, schedule, onSaved, onDelet
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <h2 className="text-lg font-bold text-gray-900">{mode === 'create' ? '일정 생성' : '일정 수정'}</h2>
+
+      <ScheduleConflictBanner warnings={conflictWarnings} members={members} />
 
       <div className="flex flex-col gap-1">
         <label htmlFor="schedule-title" className="text-sm text-gray-700">

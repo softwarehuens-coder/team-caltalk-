@@ -65,10 +65,12 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
     setEditingSchedule(null);
   };
 
-  const handleFormSaved = (): void => {
+  const handleFormSaved = (_schedule: Schedule, hasConflicts?: boolean): void => {
     void refresh();
-    setFormMode(null);
-    setEditingSchedule(null);
+    if (!hasConflicts) {
+      setFormMode(null);
+      setEditingSchedule(null);
+    }
   };
 
   const handleFormDeleted = (): void => {

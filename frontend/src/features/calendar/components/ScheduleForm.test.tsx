@@ -151,7 +151,51 @@ describe('ScheduleForm - 생성 모드 정상 제출', () => {
       });
     });
     await waitFor(() => {
-      expect(onSaved).toHaveBeenCalledWith(response.schedule);
+      expect(onSaved).toHaveBeenCalledWith(response.schedule, false);
+    });
+  });
+
+  it('일정 생성 성공 시 충돌 경고가 포함되어 있으면 충돌 배너를 렌더링하고 onSaved를 hasConflicts=true로 호출한다', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    const response = {
+      schedule: {
+        id: 's1',
+        teamId: 't1',
+        title: '주간 회의',
+        startAt: new Date(2026, 3, 15, 9, 0).toISOString(),
+        endAt: new Date(2026, 3, 15, 10, 0).toISOString(),
+        createdAt: '2026-04-01T00:00:00.000Z',
+        deletedAt: null,
+        participants: [],
+      },
+      conflictWarnings: [
+        {
+          conflictingScheduleId: 's2',
+          conflictingUserId: 'u2',
+          conflictingScheduleTitle: '고객사 미팅',
+        },
+      ],
+    };
+    createScheduleMock.mockResolvedValue(response);
+    const { container } = render(
+      <ScheduleForm teamId="t1" members={members} mode="create" onSaved={onSaved} onCancel={vi.fn()} />,
+    );
+
+    await fillTitle(user, '주간 회의');
+    setStart('2026-04-15T09:00');
+    setEnd('2026-04-15T10:00');
+    fireEvent.submit(getForm(container));
+
+    await waitFor(() => {
+      expect(createScheduleMock).toHaveBeenCalled();
+    });
+    
+    expect(await screen.findByText(/일정 충돌 경고/)).toBeInTheDocument();
+    expect(screen.getByText('김철수님이 참여하는 "고객사 미팅" 일정과 시간이 겹칩니다.')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith(response.schedule, true);
     });
   });
 
@@ -261,7 +305,57 @@ describe('ScheduleForm - 수정 모드', () => {
       });
     });
     await waitFor(() => {
-      expect(onSaved).toHaveBeenCalledWith(response.schedule);
+      expect(onSaved).toHaveBeenCalledWith(response.schedule, false);
+    });
+  });
+
+  it('일정 수정 성공 시 충돌 경고가 포함되어 있으면 충돌 배너를 렌더링하고 onSaved를 hasConflicts=true로 호출한다', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    const response = {
+      schedule: {
+        id: 's1',
+        teamId: 't1',
+        title: '기존 회의(변경)',
+        startAt: editSchedule.startAt,
+        endAt: editSchedule.endAt,
+        createdAt: '2026-04-01T00:00:00.000Z',
+        deletedAt: null,
+        participants: [{ id: 'p1', scheduleId: 's1', userId: 'u2', createdAt: '2026-04-01T00:00:00.000Z' }],
+      },
+      conflictWarnings: [
+        {
+          conflictingScheduleId: 's3',
+          conflictingUserId: 'u1',
+          conflictingScheduleTitle: '주간 회의',
+        },
+      ],
+    };
+    updateScheduleMock.mockResolvedValue(response);
+    const { container } = render(
+      <ScheduleForm
+        teamId="t1"
+        members={members}
+        mode="edit"
+        schedule={editSchedule}
+        onSaved={onSaved}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText('제목'));
+    await user.type(screen.getByLabelText('제목'), '기존 회의(변경)');
+    fireEvent.submit(getForm(container));
+
+    await waitFor(() => {
+      expect(updateScheduleMock).toHaveBeenCalled();
+    });
+    
+    expect(await screen.findByText(/일정 충돌 경고/)).toBeInTheDocument();
+    expect(screen.getByText('홍길동님이 참여하는 "주간 회의" 일정과 시간이 겹칩니다.')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith(response.schedule, true);
     });
   });
 
