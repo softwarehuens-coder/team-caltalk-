@@ -8,6 +8,7 @@ import { useCalendarNavigation } from '../hooks/use-calendar-navigation';
 import { useTeamSchedules } from '../hooks/use-team-schedules';
 import { getMonthGridDays, getWeekDays } from '../utils/calendar-date.util';
 import { groupSchedulesByDay } from '../utils/schedule-period.util';
+import { ScheduleChatPanel } from '../../chat/components/ScheduleChatPanel';
 import { AgendaListView } from './AgendaListView';
 import { CalendarToolbar } from './CalendarToolbar';
 import { MonthGrid } from './MonthGrid';
@@ -29,7 +30,7 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
     refresh,
   } = useTeamSchedules(team?.id ?? null, view, dateParam);
 
-  const [, setSelectedScheduleId] = useState<string | null>(null);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
 
@@ -47,14 +48,16 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
 
   const currentMember = members.find((member) => member.userId === user?.id);
   const isLeader = currentMember?.role === 'LEADER';
+  const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId) ?? null;
 
   const handleScheduleClick = (schedule: Schedule): void => {
     setSelectedScheduleId(schedule.id);
     onScheduleClick?.(schedule);
-    if (isLeader) {
-      setFormMode('edit');
-      setEditingSchedule(schedule);
-    }
+  };
+
+  const handleEditClick = (schedule: Schedule): void => {
+    setFormMode('edit');
+    setEditingSchedule(schedule);
   };
 
   const handleCreateClick = (): void => {
@@ -152,6 +155,15 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
           <AgendaListView days={days} schedulesByDay={schedulesByDay} onScheduleClick={handleScheduleClick} />
         )}
       </div>
+      {selectedSchedule && (
+        <ScheduleChatPanel
+          schedule={selectedSchedule}
+          members={members}
+          isLeader={isLeader}
+          onClose={() => setSelectedScheduleId(null)}
+          onEditClick={handleEditClick}
+        />
+      )}
       {formMode && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">

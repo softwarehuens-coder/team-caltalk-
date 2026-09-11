@@ -63,6 +63,24 @@ vi.mock('./AgendaListView', () => ({
   AgendaListView: () => <div data-testid="agenda-view" />,
 }));
 
+vi.mock('../../chat/components/ScheduleChatPanel', () => ({
+  ScheduleChatPanel: (props: {
+    schedule: Schedule;
+    isLeader: boolean;
+    onClose(): void;
+    onEditClick(schedule: Schedule): void;
+  }) => (
+    <div data-testid="chat-panel" data-schedule-id={props.schedule.id} data-leader={String(props.isLeader)}>
+      <button type="button" onClick={() => props.onEditClick(props.schedule)}>
+        패널수정
+      </button>
+      <button type="button" onClick={() => props.onClose()}>
+        패널닫기
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock('./ScheduleForm', () => ({
   ScheduleForm: (props: {
     teamId: string;
@@ -264,22 +282,7 @@ describe('CalendarView', () => {
     expect(screen.getByTestId('schedule-form')).toHaveAttribute('data-mode', 'create');
   });
 
-  it('LEADER가 일정을 클릭하면 mode=edit이고 해당 일정으로 ScheduleForm을 렌더링한다', async () => {
-    const user = userEvent.setup();
-    setupDefaults();
-    const schedule = buildSchedule('s1', '주간 회의');
-    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
-
-    renderView();
-
-    await user.click(screen.getByRole('button', { name: '주간 회의' }));
-
-    const form = screen.getByTestId('schedule-form');
-    expect(form).toHaveAttribute('data-mode', 'edit');
-    expect(form).toHaveAttribute('data-schedule-id', 's1');
-  });
-
-  it('MEMBER는 일정을 클릭해도 ScheduleForm이 열리지 않는다', async () => {
+  it('일정을 클릭하면 역할과 무관하게 ScheduleChatPanel을 렌더링하고 selectedScheduleId에 매칭되는 일정을 전달한다', async () => {
     const user = userEvent.setup();
     setupDefaults();
     useTeamMembersMock.mockReturnValue({ members: [leaderMember('MEMBER')], isLoading: false, error: null, refresh: vi.fn() });
@@ -288,9 +291,44 @@ describe('CalendarView', () => {
 
     renderView();
 
+    expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: '주간 회의' }));
 
-    expect(screen.queryByTestId('schedule-form')).not.toBeInTheDocument();
+    const panel = screen.getByTestId('chat-panel');
+    expect(panel).toHaveAttribute('data-schedule-id', 's1');
+  });
+
+  it('ScheduleChatPanel의 onEditClick이 호출되면 mode=edit으로 ScheduleForm이 열린다', async () => {
+    const user = userEvent.setup();
+    setupDefaults();
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+
+    renderView();
+
+    await user.click(screen.getByRole('button', { name: '주간 회의' }));
+    await user.click(screen.getByRole('button', { name: '패널수정' }));
+
+    const form = screen.getByTestId('schedule-form');
+    expect(form).toHaveAttribute('data-mode', 'edit');
+    expect(form).toHaveAttribute('data-schedule-id', 's1');
+  });
+
+  it('ScheduleChatPanel의 onClose가 호출되면 패널이 닫힌다', async () => {
+    const user = userEvent.setup();
+    setupDefaults();
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+
+    renderView();
+
+    await user.click(screen.getByRole('button', { name: '주간 회의' }));
+    expect(screen.getByTestId('chat-panel')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '패널닫기' }));
+
+    expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument();
   });
 
   it('ScheduleForm의 onSaved가 호출되면 refresh를 호출하고 폼을 닫는다', async () => {
@@ -318,6 +356,7 @@ describe('CalendarView', () => {
     renderView();
 
     await user.click(screen.getByRole('button', { name: '주간 회의' }));
+    await user.click(screen.getByRole('button', { name: '패널수정' }));
     expect(screen.getByTestId('schedule-form')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '삭제' }));

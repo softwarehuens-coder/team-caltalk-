@@ -16,6 +16,7 @@ export default defineConfig({
         'src/features/auth/**/*.{ts,tsx}',
         'src/features/team/**/*.{ts,tsx}',
         'src/features/calendar/**/*.{ts,tsx}',
+        'src/features/chat/**/*.{ts,tsx}',
         'src/app/**/*.{ts,tsx}',
       ],
       exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts'],
