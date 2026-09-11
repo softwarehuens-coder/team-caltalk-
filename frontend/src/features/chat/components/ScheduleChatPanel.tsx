@@ -1,11 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useAuth } from '../../auth/hooks/use-auth';
 import type { ChatMessage } from '../../../shared/types/chat.types';
 import type { Schedule } from '../../../shared/types/schedule.types';
 import type { TeamMember } from '../../../shared/types/team.types';
+import type { ChangeRequest } from '../../../shared/types/change-request.types';
 import { useChatSocket, type ChatConnectionStatus } from '../hooks/use-chat-socket';
 import { getScheduleMessages } from '../api/chat.api';
 import { ApiError } from '../../../shared/api/api-error';
+import { ChangeRequestForm } from './ChangeRequestForm';
 
 export interface ScheduleChatPanelProps {
   schedule: Schedule;
@@ -30,6 +32,44 @@ function mergeById(a: ChatMessage[], b: ChatMessage[]): ChatMessage[] {
   [...a, ...b].forEach((m) => map.set(m.id, m));
   return Array.from(map.values()).sort(
     (x, y) => new Date(x.createdAt).getTime() - new Date(y.createdAt).getTime(),
+  );
+}
+
+type TimelineItem =
+  | { kind: 'message'; key: string; createdAt: string; message: ChatMessage }
+  | { kind: 'changeRequest'; key: string; createdAt: string; changeRequest: ChangeRequest };
+
+function buildTimeline(messages: ChatMessage[], changeRequests: ChangeRequest[]): TimelineItem[] {
+  const items: TimelineItem[] = [
+    ...messages.map((m) => ({ kind: 'message' as const, key: `m-${m.id}`, createdAt: m.createdAt, message: m })),
+    ...changeRequests.map((c) => ({
+      kind: 'changeRequest' as const,
+      key: `c-${c.id}`,
+      createdAt: c.createdAt,
+      changeRequest: c,
+    })),
+  ];
+  return items.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+}
+
+function ChangeRequestCard({ changeRequest, members }: { changeRequest: ChangeRequest; members: TeamMember[] }) {
+  const requesterName = members.find((m) => m.userId === changeRequest.requestedByUserId)?.name ?? '알 수 없음';
+  return (
+    <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-gray-700">
+      <p className="font-medium text-amber-700">[변경 요청 - 대기중]</p>
+      <p className="mt-1 text-gray-900">{requesterName}</p>
+      <dl className="mt-1 flex flex-col gap-0.5">
+        <div className="flex gap-2">
+          <dt className="shrink-0 text-gray-500">희망 시작</dt>
+          <dd>{formatDateTime(changeRequest.desiredStartAt)}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="shrink-0 text-gray-500">희망 종료</dt>
+          <dd>{formatDateTime(changeRequest.desiredEndAt)}</dd>
+        </div>
+      </dl>
+      {changeRequest.reason && <p className="mt-1 whitespace-pre-wrap">{changeRequest.reason}</p>}
+    </div>
   );
 }
 
@@ -74,8 +114,10 @@ function StatusBadge({ status, onReLogin }: { status: ChatConnectionStatus; onRe
 }
 
 export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEditClick }: ScheduleChatPanelProps) {
-  const { token, logout } = useAuth();
+  const { token, logout, user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [pendingChangeRequests, setPendingChangeRequests] = useState<ChangeRequest[]>([]);
+  const [isChangeRequestFormOpen, setIsChangeRequestFormOpen] = useState(false);
   const [content, setContent] = useState('');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -89,6 +131,8 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
   useEffect(() => {
     let cancelled = false;
     setMessages([]);
+    setPendingChangeRequests([]);
+    setIsChangeRequestFormOpen(false);
     setNextCursor(null);
     setHasMore(false);
     setIsLoadingHistory(true);
@@ -118,13 +162,18 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message])),
   });
 
+  const timeline = useMemo(
+    () => buildTimeline(messages, pendingChangeRequests),
+    [messages, pendingChangeRequests],
+  );
+
   useEffect(() => {
     if (isPrependingRef.current) return;
     const container = scrollContainerRef.current;
     if (container) {
       container.scrollTop = container.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, pendingChangeRequests]);
 
   useLayoutEffect(() => {
     if (!isPrependingRef.current) return;
@@ -156,6 +205,9 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
   const participantNames = schedule.participants
     .map((participant) => members.find((member) => member.userId === participant.userId)?.name ?? participant.userId)
     .join(', ');
+
+  const isParticipant = schedule.participants.some((p) => p.userId === user?.id);
+  const canSubmitChangeRequest = !isLeader && isParticipant;
 
   const handleSend = (): void => {
     const trimmed = content.trim();
@@ -218,7 +270,7 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
               <p className="text-sm text-gray-400">채팅 이력을 불러오는 중입니다..</p>
             ) : historyError ? (
               <p className="text-sm text-red-500">{getHistoryErrorMessage(historyError)}</p>
-            ) : messages.length === 0 ? (
+            ) : timeline.length === 0 ? (
               <p className="text-sm text-gray-400">아직 메시지가 없습니다</p>
             ) : (
               <>
@@ -235,10 +287,18 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
                   </div>
                 )}
                 <ul className="flex flex-col gap-3">
-                  {messages.map((message) => {
+                  {timeline.map((item) => {
+                    if (item.kind === 'changeRequest') {
+                      return (
+                        <li key={item.key}>
+                          <ChangeRequestCard changeRequest={item.changeRequest} members={members} />
+                        </li>
+                      );
+                    }
+                    const message = item.message;
                     const senderName = members.find((member) => member.userId === message.senderUserId)?.name ?? '알 수 없음';
                     return (
-                      <li key={message.id} className="text-sm text-gray-700">
+                      <li key={item.key} className="text-sm text-gray-700">
                         <div className="flex items-baseline gap-2">
                           <span className="font-medium text-gray-900">{senderName}</span>
                           <span className="text-xs text-gray-400">{formatTime(message.createdAt)}</span>
@@ -251,6 +311,17 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
               </>
             )}
           </div>
+          {canSubmitChangeRequest && (
+            <div className="border-t border-gray-200 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setIsChangeRequestFormOpen(true)}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                변경 요청 작성
+              </button>
+            </div>
+          )}
           <div className="flex flex-col gap-2 border-t border-gray-200 p-3">
             <textarea
               value={content}
@@ -276,6 +347,21 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
           </div>
         </aside>
       </div>
+      {isChangeRequestFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+            <ChangeRequestForm
+              scheduleId={schedule.id}
+              scheduleTitle={schedule.title}
+              onSubmitted={(cr) => {
+                setPendingChangeRequests((prev) => [...prev, cr]);
+                setIsChangeRequestFormOpen(false);
+              }}
+              onCancel={() => setIsChangeRequestFormOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

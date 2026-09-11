@@ -1,10 +1,11 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Schedule } from '../../../shared/types/schedule.types';
+import type { Schedule, ScheduleParticipant } from '../../../shared/types/schedule.types';
 import type { TeamMember } from '../../../shared/types/team.types';
 import type { ChatMessage, PaginatedChatMessages } from '../../../shared/types/chat.types';
+import type { ChangeRequest } from '../../../shared/types/change-request.types';
 import { ApiError } from '../../../shared/api/api-error';
 
 type UseChatSocketOptions = {
@@ -30,8 +31,13 @@ vi.mock('../api/chat.api', () => ({
   getScheduleMessages: vi.fn(),
 }));
 
+vi.mock('../api/change-request.api', () => ({
+  submitChangeRequest: vi.fn(),
+}));
+
 import { ScheduleChatPanel } from './ScheduleChatPanel';
 import { getScheduleMessages } from '../api/chat.api';
+import { submitChangeRequest } from '../api/change-request.api';
 
 const members: TeamMember[] = [
   { userId: 'u1', email: 'leader@test.com', name: '홍길동', role: 'LEADER', joinedAt: '2026-01-01T00:00:00.000Z' },
@@ -59,6 +65,31 @@ function buildMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
     senderUserId: 'u2',
     content: '안녕하세요',
     createdAt: '2026-04-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function buildParticipant(userId: string, overrides: Partial<ScheduleParticipant> = {}): ScheduleParticipant {
+  return {
+    id: `p-${userId}`,
+    scheduleId: 's1',
+    userId,
+    createdAt: '2026-04-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function buildChangeRequest(overrides: Partial<ChangeRequest> = {}): ChangeRequest {
+  return {
+    id: 'cr1',
+    scheduleId: 's1',
+    requestedByUserId: 'u2',
+    status: 'PENDING',
+    desiredStartAt: '2026-04-20T09:00:00.000Z',
+    desiredEndAt: '2026-04-20T10:00:00.000Z',
+    reason: null,
+    createdAt: '2026-04-02T00:00:00.000Z',
+    decidedAt: null,
     ...overrides,
   };
 }
@@ -491,5 +522,151 @@ describe('ScheduleChatPanel - 채팅 이력 조회', () => {
     renderPanel();
 
     expect(await screen.findByText(/채팅 이력을 찾을 수 없습니다/)).toBeInTheDocument();
+  });
+});
+
+describe('ScheduleChatPanel - 변경 요청', () => {
+  const currentUser = { id: 'u2', email: 'member@test.com', name: '김철수', createdAt: '2026-01-01T00:00:00.000Z' };
+
+  function scheduleWithParticipant(id = 's1', title = '주간 회의'): Schedule {
+    return buildSchedule(id, title, { participants: [buildParticipant('u2', { scheduleId: id })] });
+  }
+
+  it('isLeader=true이면 변경 요청 작성 버튼이 노출되지 않는다', () => {
+    setupChatSocket('open');
+    useAuthMock.mockReturnValue({ token: 't', logout: logoutMock, user: currentUser });
+
+    renderPanel({ isLeader: true, schedule: scheduleWithParticipant() });
+
+    expect(screen.queryByRole('button', { name: '변경 요청 작성' })).not.toBeInTheDocument();
+  });
+
+  it('isLeader=false이고 참여자가 아니면 변경 요청 작성 버튼이 노출되지 않는다', () => {
+    setupChatSocket('open');
+    useAuthMock.mockReturnValue({ token: 't', logout: logoutMock, user: currentUser });
+
+    renderPanel({ isLeader: false, schedule: buildSchedule('s1', '주간 회의', { participants: [] }) });
+
+    expect(screen.queryByRole('button', { name: '변경 요청 작성' })).not.toBeInTheDocument();
+  });
+
+  it('isLeader=false이고 참여자이면 변경 요청 작성 버튼이 노출된다', () => {
+    setupChatSocket('open');
+    useAuthMock.mockReturnValue({ token: 't', logout: logoutMock, user: currentUser });
+
+    renderPanel({ isLeader: false, schedule: scheduleWithParticipant() });
+
+    expect(screen.getByRole('button', { name: '변경 요청 작성' })).toBeInTheDocument();
+  });
+
+  it('변경 요청 작성 버튼을 클릭하면 변경 요청 폼 모달이 노출된다', async () => {
+    const user = userEvent.setup();
+    setupChatSocket('open');
+    useAuthMock.mockReturnValue({ token: 't', logout: logoutMock, user: currentUser });
+
+    renderPanel({ isLeader: false, schedule: scheduleWithParticipant() });
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+
+    expect(screen.getByLabelText('희망 시작 일시')).toBeInTheDocument();
+    expect(screen.getByLabelText('희망 종료 일시')).toBeInTheDocument();
+  });
+
+  it('변경 요청 폼에서 취소를 클릭하면 모달이 닫히고 패널은 유지된다', async () => {
+    const user = userEvent.setup();
+    setupChatSocket('open');
+    useAuthMock.mockReturnValue({ token: 't', logout: logoutMock, user: currentUser });
+
+    renderPanel({ isLeader: false, schedule: scheduleWithParticipant() });
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByLabelText('희망 시작 일시')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '변경 요청 작성' })).toBeInTheDocument();
+  });
+
+  it('변경 요청 제출에 성공하면 모달이 닫히고 대기중 카드가 메시지 목록에 표시된다', async () => {
+    const user = userEvent.setup();
+    setupChatSocket('open');
+    useAuthMock.mockReturnValue({ token: 't', logout: logoutMock, user: currentUser });
+    const response = buildChangeRequest({
+      desiredStartAt: new Date(2026, 3, 20, 9, 0).toISOString(),
+      desiredEndAt: new Date(2026, 3, 20, 10, 0).toISOString(),
+      reason: '회의실 변경 필요',
+    });
+    vi.mocked(submitChangeRequest).mockResolvedValue(response);
+
+    renderPanel({ isLeader: false, schedule: scheduleWithParticipant() });
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    fireEvent.change(screen.getByLabelText('희망 시작 일시'), { target: { value: '2026-04-20T09:00' } });
+    fireEvent.change(screen.getByLabelText('희망 종료 일시'), { target: { value: '2026-04-20T10:00' } });
+    await user.type(screen.getByLabelText('사유'), '회의실 변경 필요');
+    await user.click(screen.getByRole('button', { name: '요청 보내기' }));
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('희망 시작 일시')).not.toBeInTheDocument();
+    });
+    const cardHeader = await screen.findByText('[변경 요청 - 대기중]');
+    const card = within(cardHeader.parentElement as HTMLElement);
+    expect(card.getByText('김철수')).toBeInTheDocument();
+    expect(card.getByText('회의실 변경 필요')).toBeInTheDocument();
+    expect(card.getByText(new Date(response.desiredStartAt).toLocaleString('ko-KR'))).toBeInTheDocument();
+    expect(card.getByText(new Date(response.desiredEndAt).toLocaleString('ko-KR'))).toBeInTheDocument();
+  });
+
+  it('메시지와 대기중 카드가 createdAt 기준 시간순으로 렌더링된다', async () => {
+    const user = userEvent.setup();
+    setupChatSocket('open');
+    useAuthMock.mockReturnValue({ token: 't', logout: logoutMock, user: currentUser });
+    vi.mocked(getScheduleMessages).mockResolvedValue({
+      data: [
+        buildMessage({ id: 'm1', content: '첫 메시지', createdAt: '2026-04-01T00:00:00.000Z' }),
+        buildMessage({ id: 'm2', content: '세번째 메시지', createdAt: '2026-04-03T00:00:00.000Z' }),
+      ],
+      nextCursor: null,
+      hasMore: false,
+    });
+    const response = buildChangeRequest({ createdAt: '2026-04-02T00:00:00.000Z' });
+    vi.mocked(submitChangeRequest).mockResolvedValue(response);
+
+    renderPanel({ isLeader: false, schedule: scheduleWithParticipant() });
+    await screen.findByText('첫 메시지');
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    fireEvent.change(screen.getByLabelText('희망 시작 일시'), { target: { value: '2026-04-20T09:00' } });
+    fireEvent.change(screen.getByLabelText('희망 종료 일시'), { target: { value: '2026-04-20T10:00' } });
+    await user.click(screen.getByRole('button', { name: '요청 보내기' }));
+
+    const first = await screen.findByText('첫 메시지');
+    const pendingCard = await screen.findByText('[변경 요청 - 대기중]');
+    const third = screen.getByText('세번째 메시지');
+
+    expect(first.compareDocumentPosition(pendingCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pendingCard.compareDocumentPosition(third) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('schedule.id가 변경되면 이전 일정의 대기중 카드가 사라진다', async () => {
+    const user = userEvent.setup();
+    setupChatSocket('open');
+    useAuthMock.mockReturnValue({ token: 't', logout: logoutMock, user: currentUser });
+    vi.mocked(submitChangeRequest).mockResolvedValue(buildChangeRequest());
+    const scheduleA = scheduleWithParticipant('s1', '주간 회의');
+
+    const { rerender } = render(
+      <ScheduleChatPanel schedule={scheduleA} members={members} isLeader={false} onClose={vi.fn()} onEditClick={vi.fn()} />,
+    );
+    await screen.findByText('아직 메시지가 없습니다');
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    fireEvent.change(screen.getByLabelText('희망 시작 일시'), { target: { value: '2026-04-20T09:00' } });
+    fireEvent.change(screen.getByLabelText('희망 종료 일시'), { target: { value: '2026-04-20T10:00' } });
+    await user.click(screen.getByRole('button', { name: '요청 보내기' }));
+    expect(await screen.findByText('[변경 요청 - 대기중]')).toBeInTheDocument();
+
+    const scheduleB = scheduleWithParticipant('s2', '월간 회의');
+    rerender(
+      <ScheduleChatPanel schedule={scheduleB} members={members} isLeader={false} onClose={vi.fn()} onEditClick={vi.fn()} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText('[변경 요청 - 대기중]')).not.toBeInTheDocument();
+    });
   });
 });
