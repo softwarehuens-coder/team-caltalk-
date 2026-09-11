@@ -33,11 +33,13 @@ vi.mock('../api/chat.api', () => ({
 
 vi.mock('../api/change-request.api', () => ({
   submitChangeRequest: vi.fn(),
+  approveChangeRequest: vi.fn(),
+  rejectChangeRequest: vi.fn(),
 }));
 
 import { ScheduleChatPanel } from './ScheduleChatPanel';
 import { getScheduleMessages } from '../api/chat.api';
-import { submitChangeRequest } from '../api/change-request.api';
+import { submitChangeRequest, approveChangeRequest, rejectChangeRequest } from '../api/change-request.api';
 
 const members: TeamMember[] = [
   { userId: 'u1', email: 'leader@test.com', name: '홍길동', role: 'LEADER', joinedAt: '2026-01-01T00:00:00.000Z' },
@@ -668,5 +670,280 @@ describe('ScheduleChatPanel - 변경 요청', () => {
     await waitFor(() => {
       expect(screen.queryByText('[변경 요청 - 대기중]')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('ScheduleChatPanel - 변경 요청 승인/거절 (FE-8)', () => {
+  const currentUser = { id: 'u2', email: 'member@test.com', name: '김철수', createdAt: '2026-01-01T00:00:00.000Z' };
+
+  beforeEach(() => {
+    setupChatSocket('open');
+    useAuthMock.mockReturnValue({ token: 't', logout: logoutMock, user: currentUser });
+    vi.mocked(getScheduleMessages).mockResolvedValue({
+      data: [],
+      nextCursor: null,
+      hasMore: false,
+    });
+  });
+
+  afterEach(() => {
+    vi.mocked(approveChangeRequest).mockReset();
+    vi.mocked(rejectChangeRequest).mockReset();
+    vi.mocked(getScheduleMessages).mockReset();
+  });
+
+  const scheduleA = buildSchedule('s1', '주간 회의', {
+    participants: [buildParticipant('u2', { scheduleId: 's1' })],
+  });
+
+  it('isLeader=true 이면 PENDING 변경 요청 카드에 승인 및 거절 버튼이 노출된다', async () => {
+    const response = buildChangeRequest({ status: 'PENDING' });
+    vi.mocked(submitChangeRequest).mockResolvedValue(response);
+
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={false}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    // Submit a change request as a member first
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    fireEvent.change(screen.getByLabelText('희망 시작 일시'), { target: { value: '2026-04-20T09:00' } });
+    fireEvent.change(screen.getByLabelText('희망 종료 일시'), { target: { value: '2026-04-20T10:00' } });
+    await user.click(screen.getByRole('button', { name: '요청 보내기' }));
+
+    expect(await screen.findByText('[변경 요청 - 대기중]')).toBeInTheDocument();
+
+    // Now rerender as leader to see the approve/reject buttons
+    rerender(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={true}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: '승인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '거절' })).toBeInTheDocument();
+  });
+
+  it('isLeader=false 이면 PENDING 변경 요청 카드에 승인 및 거절 버튼이 노출되지 않는다', async () => {
+    const response = buildChangeRequest({ status: 'PENDING' });
+    vi.mocked(submitChangeRequest).mockResolvedValue(response);
+
+    const user = userEvent.setup();
+    render(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={false}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    fireEvent.change(screen.getByLabelText('희망 시작 일시'), { target: { value: '2026-04-20T09:00' } });
+    fireEvent.change(screen.getByLabelText('희망 종료 일시'), { target: { value: '2026-04-20T10:00' } });
+    await user.click(screen.getByRole('button', { name: '요청 보내기' }));
+
+    expect(await screen.findByText('[변경 요청 - 대기중]')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '거절' })).not.toBeInTheDocument();
+  });
+
+  it('승인 클릭 시 approveChangeRequest API가 호출되고 상태가 APPROVED로 변경되며 콜백들이 실행된다', async () => {
+    const pendingRequest = buildChangeRequest({ id: 'cr1', status: 'PENDING' });
+    const approvedRequest = { ...pendingRequest, status: 'APPROVED' as const };
+
+    vi.mocked(submitChangeRequest).mockResolvedValue(pendingRequest);
+    vi.mocked(approveChangeRequest).mockResolvedValue(approvedRequest);
+
+    const onScheduleApprovedMock = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={false}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+        onScheduleApproved={onScheduleApprovedMock}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    fireEvent.change(screen.getByLabelText('희망 시작 일시'), { target: { value: '2026-04-20T09:00' } });
+    fireEvent.change(screen.getByLabelText('희망 종료 일시'), { target: { value: '2026-04-20T10:00' } });
+    await user.click(screen.getByRole('button', { name: '요청 보내기' }));
+
+    expect(await screen.findByText('[변경 요청 - 대기중]')).toBeInTheDocument();
+
+    // Rerender as leader
+    rerender(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={true}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+        onScheduleApproved={onScheduleApprovedMock}
+      />
+    );
+
+    const approveButton = await screen.findByRole('button', { name: '승인' });
+    await user.click(approveButton);
+
+    await waitFor(() => {
+      expect(approveChangeRequest).toHaveBeenCalledWith('cr1');
+    });
+    expect(await screen.findByText('[변경 요청 - 승인됨]')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
+    expect(onScheduleApprovedMock).toHaveBeenCalled();
+    expect(getScheduleMessages).toHaveBeenCalled();
+  });
+
+  it('거절 클릭 후 거절 사유가 비어 있으면 경고를 표시하고 제출을 차단한다', async () => {
+    const pendingRequest = buildChangeRequest({ id: 'cr1', status: 'PENDING' });
+    vi.mocked(submitChangeRequest).mockResolvedValue(pendingRequest);
+
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={false}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    fireEvent.change(screen.getByLabelText('희망 시작 일시'), { target: { value: '2026-04-20T09:00' } });
+    fireEvent.change(screen.getByLabelText('희망 종료 일시'), { target: { value: '2026-04-20T10:00' } });
+    await user.click(screen.getByRole('button', { name: '요청 보내기' }));
+
+    expect(await screen.findByText('[변경 요청 - 대기중]')).toBeInTheDocument();
+
+    // Rerender as leader
+    rerender(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={true}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    const rejectButton = await screen.findByRole('button', { name: '거절' });
+    await user.click(rejectButton);
+
+    expect(screen.getByText('거절 사유 (필수)')).toBeInTheDocument();
+    const confirmButton = screen.getByRole('button', { name: '거절 확정' });
+    await user.click(confirmButton);
+
+    expect(screen.getByText('거절 사유를 입력해주세요')).toBeInTheDocument();
+    expect(rejectChangeRequest).not.toHaveBeenCalled();
+  });
+
+  it('거절 사유를 입력하고 확정하면 rejectChangeRequest API가 호출되고 상태가 REJECTED로 변경된다', async () => {
+    const pendingRequest = buildChangeRequest({ id: 'cr1', status: 'PENDING' });
+    const rejectedRequest = { ...pendingRequest, status: 'REJECTED' as const };
+
+    vi.mocked(submitChangeRequest).mockResolvedValue(pendingRequest);
+    vi.mocked(rejectChangeRequest).mockResolvedValue(rejectedRequest);
+
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={false}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    fireEvent.change(screen.getByLabelText('희망 시작 일시'), { target: { value: '2026-04-20T09:00' } });
+    fireEvent.change(screen.getByLabelText('희망 종료 일시'), { target: { value: '2026-04-20T10:00' } });
+    await user.click(screen.getByRole('button', { name: '요청 보내기' }));
+
+    expect(await screen.findByText('[변경 요청 - 대기중]')).toBeInTheDocument();
+
+    // Rerender as leader
+    rerender(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={true}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    const rejectButton = await screen.findByRole('button', { name: '거절' });
+    await user.click(rejectButton);
+
+    const textarea = screen.getByPlaceholderText('거절 사유를 입력하세요.');
+    await user.type(textarea, '시간 겹침');
+
+    const confirmButton = screen.getByRole('button', { name: '거절 확정' });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(rejectChangeRequest).toHaveBeenCalledWith('cr1', { reason: '시간 겹침' });
+    });
+    expect(await screen.findByText('[변경 요청 - 거절됨]')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
+    expect(getScheduleMessages).toHaveBeenCalled();
+  });
+
+  it('이미 처리된 경우(409)에는 에러 메시지를 표시하고 액션을 비활성화한다', async () => {
+    const pendingRequest = buildChangeRequest({ id: 'cr1', status: 'PENDING' });
+    vi.mocked(submitChangeRequest).mockResolvedValue(pendingRequest);
+    vi.mocked(approveChangeRequest).mockRejectedValue(new ApiError(409, 'ALREADY_DECIDED', '이미 결정된 요청입니다.'));
+
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={false}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: '변경 요청 작성' }));
+    fireEvent.change(screen.getByLabelText('희망 시작 일시'), { target: { value: '2026-04-20T09:00' } });
+    fireEvent.change(screen.getByLabelText('희망 종료 일시'), { target: { value: '2026-04-20T10:00' } });
+    await user.click(screen.getByRole('button', { name: '요청 보내기' }));
+
+    expect(await screen.findByText('[변경 요청 - 대기중]')).toBeInTheDocument();
+
+    // Rerender as leader
+    rerender(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={true}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    const approveButton = await screen.findByRole('button', { name: '승인' });
+    await user.click(approveButton);
+
+    expect(await screen.findByText('이미 결정된 요청입니다.')).toBeInTheDocument();
   });
 });

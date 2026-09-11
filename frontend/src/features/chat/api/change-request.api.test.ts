@@ -8,7 +8,7 @@ vi.mock('../../../shared/api/http-client', () => ({
   post: (...args: unknown[]) => postMock(...args),
 }));
 
-import { submitChangeRequest } from './change-request.api';
+import { submitChangeRequest, approveChangeRequest, rejectChangeRequest } from './change-request.api';
 
 afterEach(() => {
   postMock.mockReset();
@@ -72,3 +72,59 @@ describe('submitChangeRequest', () => {
     await expect(submitChangeRequest('s1', buildRequestBody())).rejects.toBe(error);
   });
 });
+
+describe('approveChangeRequest', () => {
+  it('올바른 경로로 POST /change-requests/{id}/approve 를 호출한다', async () => {
+    const response = buildChangeRequest({ status: 'APPROVED' });
+    postMock.mockResolvedValue(response);
+
+    await approveChangeRequest('cr1');
+
+    expect(postMock).toHaveBeenCalledWith('/change-requests/cr1/approve');
+  });
+
+  it('성공하면 APPROVED 상태인 응답을 반환한다', async () => {
+    const response = buildChangeRequest({ status: 'APPROVED' });
+    postMock.mockResolvedValue(response);
+
+    const result = await approveChangeRequest('cr1');
+
+    expect(result).toEqual(response);
+  });
+
+  it('ApiError로 실패하면 그대로 전파한다', async () => {
+    const error = new ApiError(409, 'ALREADY_DECIDED', '이미 결정된 요청입니다');
+    postMock.mockRejectedValue(error);
+
+    await expect(approveChangeRequest('cr1')).rejects.toBe(error);
+  });
+});
+
+describe('rejectChangeRequest', () => {
+  it('올바른 경로와 body로 POST /change-requests/{id}/reject 를 호출한다', async () => {
+    const response = buildChangeRequest({ status: 'REJECTED', reason: '거절 사유' });
+    postMock.mockResolvedValue(response);
+    const body = { reason: '거절 사유' };
+
+    await rejectChangeRequest('cr1', body);
+
+    expect(postMock).toHaveBeenCalledWith('/change-requests/cr1/reject', body);
+  });
+
+  it('성공하면 REJECTED 상태인 응답을 반환한다', async () => {
+    const response = buildChangeRequest({ status: 'REJECTED', reason: '거절 사유' });
+    postMock.mockResolvedValue(response);
+
+    const result = await rejectChangeRequest('cr1', { reason: '거절 사유' });
+
+    expect(result).toEqual(response);
+  });
+
+  it('ApiError로 실패하면 그대로 전파한다', async () => {
+    const error = new ApiError(403, 'NOT_LEADER', '팀장만 승인/거절할 수 있습니다');
+    postMock.mockRejectedValue(error);
+
+    await expect(rejectChangeRequest('cr1', { reason: '거절 사유' })).rejects.toBe(error);
+  });
+});
+

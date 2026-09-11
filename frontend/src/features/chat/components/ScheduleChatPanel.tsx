@@ -8,6 +8,7 @@ import { useChatSocket, type ChatConnectionStatus } from '../hooks/use-chat-sock
 import { getScheduleMessages } from '../api/chat.api';
 import { ApiError } from '../../../shared/api/api-error';
 import { ChangeRequestForm } from './ChangeRequestForm';
+import { ChangeRequestApproval } from './ChangeRequestApproval';
 
 export interface ScheduleChatPanelProps {
   schedule: Schedule;
@@ -15,6 +16,7 @@ export interface ScheduleChatPanelProps {
   isLeader: boolean;
   onClose(): void;
   onEditClick(schedule: Schedule): void;
+  onScheduleApproved?: () => void;
 }
 
 const MAX_MESSAGE_LENGTH = 500;
@@ -52,26 +54,7 @@ function buildTimeline(messages: ChatMessage[], changeRequests: ChangeRequest[])
   return items.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 }
 
-function ChangeRequestCard({ changeRequest, members }: { changeRequest: ChangeRequest; members: TeamMember[] }) {
-  const requesterName = members.find((m) => m.userId === changeRequest.requestedByUserId)?.name ?? '알 수 없음';
-  return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-gray-700">
-      <p className="font-medium text-amber-700">[변경 요청 - 대기중]</p>
-      <p className="mt-1 text-gray-900">{requesterName}</p>
-      <dl className="mt-1 flex flex-col gap-0.5">
-        <div className="flex gap-2">
-          <dt className="shrink-0 text-gray-500">희망 시작</dt>
-          <dd>{formatDateTime(changeRequest.desiredStartAt)}</dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="shrink-0 text-gray-500">희망 종료</dt>
-          <dd>{formatDateTime(changeRequest.desiredEndAt)}</dd>
-        </div>
-      </dl>
-      {changeRequest.reason && <p className="mt-1 whitespace-pre-wrap">{changeRequest.reason}</p>}
-    </div>
-  );
-}
+
 
 function getHistoryErrorMessage(error: ApiError): string {
   if (error.status === 403) {
@@ -113,7 +96,7 @@ function StatusBadge({ status, onReLogin }: { status: ChatConnectionStatus; onRe
   return <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">연결 중..</span>;
 }
 
-export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEditClick }: ScheduleChatPanelProps) {
+export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEditClick, onScheduleApproved }: ScheduleChatPanelProps) {
   const { token, logout, user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pendingChangeRequests, setPendingChangeRequests] = useState<ChangeRequest[]>([]);
@@ -154,6 +137,18 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
       cancelled = true;
     };
   }, [schedule.id]);
+
+  const refreshHistory = () => {
+    getScheduleMessages(schedule.id)
+      .then((result) => {
+        setMessages((prev) => mergeById(result.data, prev));
+        setNextCursor(result.nextCursor);
+        setHasMore(result.hasMore);
+      })
+      .catch((error) => {
+        console.error('Failed to refresh history:', error);
+      });
+  };
 
   const { status, sendMessage } = useChatSocket({
     scheduleId: schedule.id,
@@ -291,7 +286,18 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
                     if (item.kind === 'changeRequest') {
                       return (
                         <li key={item.key}>
-                          <ChangeRequestCard changeRequest={item.changeRequest} members={members} />
+                          <ChangeRequestApproval
+                            changeRequest={item.changeRequest}
+                            members={members}
+                            isLeader={isLeader}
+                            onStatusUpdated={(updatedCr) => {
+                              setPendingChangeRequests((prev) =>
+                                prev.map((cr) => (cr.id === updatedCr.id ? updatedCr : cr))
+                              );
+                            }}
+                            onScheduleApproved={onScheduleApproved}
+                            onRefreshHistory={refreshHistory}
+                          />
                         </li>
                       );
                     }

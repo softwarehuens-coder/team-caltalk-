@@ -162,6 +162,7 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
           isLeader={isLeader}
           onClose={() => setSelectedScheduleId(null)}
           onEditClick={handleEditClick}
+          onScheduleApproved={refresh}
         />
       )}
       {formMode && (
