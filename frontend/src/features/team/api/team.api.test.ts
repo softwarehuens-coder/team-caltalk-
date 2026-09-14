@@ -23,6 +23,7 @@ import {
   approveJoinRequest,
   createTeam,
   delegateLeader,
+  getTeam,
   getTeamMembers,
   inviteTeamMember,
   joinTeam,
@@ -52,6 +53,25 @@ describe('createTeam', () => {
     postMock.mockRejectedValue(error);
 
     await expect(createTeam({ name: '' })).rejects.toBe(error);
+  });
+});
+
+describe('getTeam', () => {
+  it('GET /teams/{teamId} 를 호출하고 팀 정보를 반환한다', async () => {
+    const team: Team = { id: 't1', name: '프론트팀', createdAt: '2026-01-01T00:00:00.000Z' };
+    getMock.mockResolvedValue(team);
+
+    const result = await getTeam('t1');
+
+    expect(getMock).toHaveBeenCalledWith('/teams/t1');
+    expect(result).toEqual(team);
+  });
+
+  it('get이 ApiError로 실패하면(403) 그대로 전파한다', async () => {
+    const error = new ApiError(403, 'FORBIDDEN', '해당 팀의 구성원만 조회할 수 있습니다');
+    getMock.mockRejectedValue(error);
+
+    await expect(getTeam('t1')).rejects.toBe(error);
   });
 });
 

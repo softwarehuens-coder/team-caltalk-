@@ -19,7 +19,14 @@ vi.mock('./CreateTeamForm', () => ({
 }));
 
 vi.mock('./JoinTeamForm', () => ({
-  JoinTeamForm: () => <div data-testid="join-form">join</div>,
+  JoinTeamForm: ({ onJoined }: { onJoined?: (team: Team) => void }) => (
+    <div data-testid="join-form">
+      join
+      <button onClick={() => onJoined?.({ id: 't1', name: '프론트팀', createdAt: '2026-01-01T00:00:00.000Z' })}>
+        join-form-joined-stub
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('./TeamDashboard', () => ({
@@ -52,6 +59,17 @@ describe('TeamPage', () => {
 
     render(<TeamPage />);
     await user.click(screen.getByText('create-team-stub'));
+
+    expect(setTeam).toHaveBeenCalledWith(expect.objectContaining({ id: 't1', name: '프론트팀' }));
+  });
+
+  it('JoinTeamForm에서 이미 승인된 멤버로 확인되면(onJoined) setTeam이 호출된다 (승인 후 팀 진입 불가 버그 회귀 테스트)', async () => {
+    const user = userEvent.setup();
+    const setTeam = vi.fn();
+    useCurrentTeamMock.mockReturnValue({ team: null, setTeam, clearTeam: vi.fn() });
+
+    render(<TeamPage />);
+    await user.click(screen.getByText('join-form-joined-stub'));
 
     expect(setTeam).toHaveBeenCalledWith(expect.objectContaining({ id: 't1', name: '프론트팀' }));
   });

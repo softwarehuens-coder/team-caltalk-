@@ -139,4 +139,15 @@ export class PostgresChangeRequestRepository implements ChangeRequestRepository 
     );
     return result.rows[0] ? toChangeRequest(result.rows[0]) : null;
   }
+
+  async listBySchedule(scheduleId: string): Promise<ChangeRequest[]> {
+    const result = await this.pool.query<ChangeRequestRow>(
+      `SELECT id, schedule_id, requested_by_user_id, status, desired_start_at, desired_end_at, reason, created_at, decided_at
+       FROM change_requests
+       WHERE schedule_id = $1
+       ORDER BY created_at ASC`,
+      [scheduleId],
+    );
+    return result.rows.map(toChangeRequest);
+  }
 }

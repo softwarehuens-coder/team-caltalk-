@@ -1,8 +1,15 @@
 import type { Pool } from 'pg';
 import type { TeamRepository } from '../../../domain/team/team.repository';
-import type { Team, TeamMembership, TeamMember } from '../../../domain/team/team.entity';
+import type {
+  Team,
+  TeamMembership,
+  TeamMember,
+  TeamJoinRequest,
+  TeamJoinRequestStatus,
+} from '../../../domain/team/team.entity';
 import type { TeamRole } from '../../../domain/permission/permission.policy';
 import { withTransaction } from './transaction';
+import { ConflictError } from '../../../domain/shared/http-errors';
 
 interface TeamRow {
   id: string;
@@ -26,6 +33,15 @@ interface TeamMemberRow {
   joined_at: Date;
 }
 
+interface TeamJoinRequestRow {
+  id: string;
+  team_id: string;
+  requester_user_id: string;
+  status: TeamJoinRequestStatus;
+  created_at: Date;
+  decided_at: Date | null;
+}
+
 function toTeam(row: TeamRow): Team {
   return { id: row.id, name: row.name, createdAt: row.created_at.toISOString() };
 }
@@ -37,6 +53,17 @@ function toMembership(row: MembershipRow): TeamMembership {
     userId: row.user_id,
     role: row.role,
     createdAt: row.created_at.toISOString(),
+  };
+}
+
+function toJoinRequest(row: TeamJoinRequestRow): TeamJoinRequest {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    requesterUserId: row.requester_user_id,
+    status: row.status,
+    createdAt: row.created_at.toISOString(),
+    decidedAt: row.decided_at ? row.decided_at.toISOString() : null,
   };
 }
 
@@ -107,6 +134,66 @@ export class PostgresTeamRepository implements TeamRepository {
       [teamId, userId, role],
     );
     return toMembership(result.rows[0]);
+  }
+
+  async createJoinRequest(teamId: string, requesterUserId: string): Promise<TeamJoinRequest> {
+    try {
+      const result = await this.pool.query<TeamJoinRequestRow>(
+        `INSERT INTO team_join_requests (team_id, requester_user_id)
+         VALUES ($1, $2)
+         RETURNING id, team_id, requester_user_id, status, created_at, decided_at`,
+        [teamId, requesterUserId],
+      );
+      return toJoinRequest(result.rows[0]);
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && 'code' in error &&
+          (error as { code?: string }).code === '23505') {
+        throw new ConflictError('JOIN_REQUEST_ALREADY_PENDING', '이미 처리 대기 중인 가입 요청이 있습니다.');
+      }
+      throw error;
+    }
+  }
+
+  async findJoinRequest(joinRequestId: string): Promise<TeamJoinRequest | null> {
+    const result = await this.pool.query<TeamJoinRequestRow>(
+      `SELECT id, team_id, requester_user_id, status, created_at, decided_at
+       FROM team_join_requests WHERE id = $1`,
+      [joinRequestId],
+    );
+    return result.rows[0] ? toJoinRequest(result.rows[0]) : null;
+  }
+
+  async listPendingJoinRequests(teamId: string): Promise<TeamJoinRequest[]> {
+    const result = await this.pool.query<TeamJoinRequestRow>(
+      `SELECT id, team_id, requester_user_id, status, created_at, decided_at
+       FROM team_join_requests
+       WHERE team_id = $1 AND status = 'PENDING'
+       ORDER BY created_at ASC`,
+      [teamId],
+    );
+    return result.rows.map(toJoinRequest);
+  }
+
+  async approveJoinRequest(teamId: string, joinRequestId: string): Promise<TeamMembership | null> {
+    return withTransaction(this.pool, async (client) => {
+      const requestResult = await client.query<TeamJoinRequestRow>(
+        `UPDATE team_join_requests
+         SET status = 'APPROVED', decided_at = now()
+         WHERE id = $1 AND team_id = $2 AND status = 'PENDING'
+         RETURNING id, team_id, requester_user_id, status, created_at, decided_at`,
+        [joinRequestId, teamId],
+      );
+      if (requestResult.rows.length === 0) return null;
+
+      const request = requestResult.rows[0];
+      const membershipResult = await client.query<MembershipRow>(
+        `INSERT INTO team_memberships (team_id, user_id, role)
+         VALUES ($1, $2, 'MEMBER')
+         RETURNING id, team_id, user_id, role, created_at`,
+        [request.team_id, request.requester_user_id],
+      );
+      return toMembership(membershipResult.rows[0]);
+    });
   }
 
   async listMembers(teamId: string): Promise<TeamMember[]> {

@@ -65,12 +65,17 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
     setEditingSchedule(null);
   };
 
-  const handleFormSaved = (_schedule: Schedule, hasConflicts?: boolean): void => {
+  const handleFormSaved = (schedule: Schedule, hasConflicts?: boolean): void => {
     void refresh();
-    if (!hasConflicts) {
-      setFormMode(null);
-      setEditingSchedule(null);
+    if (hasConflicts) {
+      // 충돌 경고 확인을 위해 폼은 열어두되, 이미 저장된 일정을 대상으로 전환한다.
+      // (그렇지 않으면 mode가 'create'로 남아 재저장 시 일정이 중복 생성된다)
+      setFormMode('edit');
+      setEditingSchedule(schedule);
+      return;
     }
+    setFormMode(null);
+    setEditingSchedule(null);
   };
 
   const handleFormDeleted = (): void => {

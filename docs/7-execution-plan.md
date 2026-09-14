@@ -225,7 +225,8 @@ graph TD
 **완료 조건**
 - [ ] `POST /teams`: 201 + `Team`, 생성자 자동 LEADER 등록, 미인증 401
 - [ ] `POST /teams/{teamId}/invite`: 403(비팀장)/201/404(팀 없음)
-- [ ] `POST /teams/{teamId}/join`: 201 `TeamMembership`(MEMBER), 이미 소속 409, 팀 없음 404
+- [ ] `POST /teams/{teamId}/join`: 202 `TeamJoinRequest`(PENDING), 이미 소속/대기 요청 409, 팀 없음 404
+- [ ] `POST /teams/join-requests/{requestId}/approve`: 팀장만 승인 가능, 승인과 MEMBER 생성은 단일 트랜잭션, 이미 처리된 요청 409
 - [ ] `POST /teams/{teamId}/leave`: `LeaveTeamResponse{teamId, teamDissolved}`. 위임 없는 유일 팀장 탈퇴 시도 409. 유일 팀원인 팀장 탈퇴 시 팀 해체(CASCADE) + `teamDissolved=true`. 일반 탈퇴는 200 + `false`
 - [ ] `POST /teams/{teamId}/delegate-leader`: 403/409(대상 비적격)/200 + 갱신된 `TeamMembership[]`, "정확히 1명의 팀장" 불변조건 트랜잭션 보장
 - [ ] 단위 테스트: 해체 조건 분기, 위임 후 역할 전환, "정확히 1명 팀장" 불변조건

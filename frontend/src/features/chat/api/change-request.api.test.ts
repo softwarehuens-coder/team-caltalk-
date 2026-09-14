@@ -3,15 +3,23 @@ import { ApiError } from '../../../shared/api/api-error';
 import type { ChangeRequest, SubmitChangeRequestRequest } from '../../../shared/types/change-request.types';
 
 const postMock = vi.fn();
+const getMock = vi.fn();
 
 vi.mock('../../../shared/api/http-client', () => ({
   post: (...args: unknown[]) => postMock(...args),
+  get: (...args: unknown[]) => getMock(...args),
 }));
 
-import { submitChangeRequest, approveChangeRequest, rejectChangeRequest } from './change-request.api';
+import {
+  submitChangeRequest,
+  approveChangeRequest,
+  rejectChangeRequest,
+  listChangeRequests,
+} from './change-request.api';
 
 afterEach(() => {
   postMock.mockReset();
+  getMock.mockReset();
 });
 
 function buildChangeRequest(overrides: Partial<ChangeRequest> = {}): ChangeRequest {
@@ -125,6 +133,36 @@ describe('rejectChangeRequest', () => {
     postMock.mockRejectedValue(error);
 
     await expect(rejectChangeRequest('cr1', { reason: '거절 사유' })).rejects.toBe(error);
+  });
+});
+
+describe('listChangeRequests', () => {
+  it('올바른 경로로 GET /schedules/{scheduleId}/change-requests 를 호출한다', async () => {
+    const response = [buildChangeRequest()];
+    getMock.mockResolvedValue(response);
+
+    await listChangeRequests('s1');
+
+    expect(getMock).toHaveBeenCalledWith('/schedules/s1/change-requests');
+  });
+
+  it('성공하면 응답을 그대로 반환한다(상태 무관 전체 목록)', async () => {
+    const response = [
+      buildChangeRequest({ id: 'cr1', status: 'PENDING' }),
+      buildChangeRequest({ id: 'cr2', status: 'APPROVED' }),
+    ];
+    getMock.mockResolvedValue(response);
+
+    const result = await listChangeRequests('s1');
+
+    expect(result).toEqual(response);
+  });
+
+  it('ApiError로 실패하면 그대로 전파한다', async () => {
+    const error = new ApiError(403, 'FORBIDDEN', '해당 일정의 변경 요청을 조회할 권한이 없습니다');
+    getMock.mockRejectedValue(error);
+
+    await expect(listChangeRequests('s1')).rejects.toBe(error);
   });
 });
 

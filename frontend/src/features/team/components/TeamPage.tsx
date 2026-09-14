@@ -10,7 +10,7 @@ export function TeamPage() {
     return (
       <div className="mx-auto flex max-w-md flex-col gap-6 p-6">
         <CreateTeamForm onCreated={setTeam} />
-        <JoinTeamForm />
+        <JoinTeamForm onJoined={setTeam} />
       </div>
     );
   }

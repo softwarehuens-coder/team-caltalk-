@@ -6,6 +6,7 @@ import type { ChatRepository } from '../../../domain/chat/chat.repository';
 import { submitChangeRequest } from '../../../application/change-request/submit-change-request.usecase';
 import { approveChangeRequest } from '../../../application/change-request/approve-change-request.usecase';
 import { rejectChangeRequest } from '../../../application/change-request/reject-change-request.usecase';
+import { listChangeRequests } from '../../../application/change-request/list-change-requests.usecase';
 import { respondToDomainError } from '../error-mapper';
 
 // swagger/swagger.json의 변경요청 엔드포인트(UC6/UC7, SC3) 계약을 그대로 구현한다.
@@ -42,6 +43,21 @@ export function createChangeRequestRouter(
         },
       );
       res.status(201).json(changeRequest);
+    } catch (error) {
+      if (respondToDomainError(error, res)) return;
+      throw error;
+    }
+  });
+
+  router.get('/schedules/:scheduleId/change-requests', async (req, res) => {
+    try {
+      const changeRequests = await listChangeRequests(
+        scheduleRepository,
+        teamRepository,
+        changeRequestRepository,
+        { scheduleId: req.params.scheduleId, actorUserId: req.user!.userId },
+      );
+      res.status(200).json(changeRequests);
     } catch (error) {
       if (respondToDomainError(error, res)) return;
       throw error;

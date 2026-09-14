@@ -31,22 +31,24 @@ describe('joinTeam', () => {
     );
   });
 
-  it('신규 사용자는 MEMBER로 등록된다', async () => {
+  it('신규 사용자는 PENDING 가입 요청을 만들며 MEMBER로 등록되지 않는다', async () => {
     const repo = fakeTeamRepository({
       findById: vi.fn().mockResolvedValue(TEAM),
       findMembership: vi.fn().mockResolvedValue(null),
-      addMember: vi.fn().mockResolvedValue({
-        id: 'm2',
+      createJoinRequest: vi.fn().mockResolvedValue({
+        id: 'r1',
         teamId: 'team-1',
-        userId: 'u2',
-        role: 'MEMBER',
+        requesterUserId: 'u2',
+        status: 'PENDING',
         createdAt: '2026-09-09T00:00:00.000Z',
+        decidedAt: null,
       }),
     });
 
-    const membership = await joinTeam(repo, { teamId: 'team-1', userId: 'u2' });
+    const joinRequest = await joinTeam(repo, { teamId: 'team-1', userId: 'u2' });
 
-    expect(membership.role).toBe('MEMBER');
-    expect(repo.addMember).toHaveBeenCalledWith('team-1', 'u2', 'MEMBER');
+    expect(joinRequest.status).toBe('PENDING');
+    expect(repo.createJoinRequest).toHaveBeenCalledWith('team-1', 'u2');
+    expect(repo.addMember).not.toHaveBeenCalled();
   });
 });

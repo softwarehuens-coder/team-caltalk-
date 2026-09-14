@@ -39,12 +39,14 @@ describe('채팅 웹소켓 게이트웨이 (통합)', () => {
   let httpServer: HttpServer;
   let baseUrl: string;
   let userId: string;
+  let outsiderUserId: string;
   let teamId: string;
   let scheduleId: string;
   let token: string;
 
   beforeAll(async () => {
     userId = await createTestUser(`be8-gateway-${Date.now()}@example.com`, '통합테스트유저');
+    outsiderUserId = await createTestUser(`be8-outsider-${Date.now()}@example.com`, '외부테스트유저');
     const { team } = await teamRepository.createTeamWithLeader('BE-8 통합테스트팀', userId);
     teamId = team.id;
 
@@ -73,6 +75,7 @@ describe('채팅 웹소켓 게이트웨이 (통합)', () => {
   afterAll(async () => {
     await teamRepository.deleteTeam(teamId);
     await deleteTestUser(userId);
+    await deleteTestUser(outsiderUserId);
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
     await testPool.end();
   });
@@ -87,6 +90,21 @@ describe('채팅 웹소켓 게이트웨이 (통합)', () => {
     const ws = new WebSocket(`${baseUrl}?token=invalid`);
     const code = await waitForClose(ws);
     expect(code).toBe(4401);
+  });
+
+  it('다른 팀 사용자는 가입하지 않은 일정 채팅을 구독할 수 없다', async () => {
+    const outsiderToken = issueToken({ userId: outsiderUserId, email: 'ignored' }, JWT_SECRET);
+    const outsider = new WebSocket(`${baseUrl}?token=${outsiderToken}`);
+    await waitForOpen(outsider);
+
+    const received = waitForMessage(outsider);
+    outsider.send(JSON.stringify({ type: 'join', scheduleId }));
+
+    await expect(received).resolves.toMatchObject({
+      type: 'error',
+      code: 'FORBIDDEN',
+    });
+    outsider.close();
   });
 
   it('메시지 전송 시 같은 일정을 구독한 다른 클라이언트에게 실시간 브로드캐스트되고, 저장된 메시지는 BE-6과 동일한 ChatRepository로 조회된다', async () => {

@@ -4,6 +4,7 @@ import { verifySocketToken } from './ws-auth.guard';
 import { sendChatMessage } from '../../application/chat/send-chat-message.usecase';
 import { WsBroadcaster } from '../../infrastructure/websocket/ws-broadcaster';
 import { NotFoundError, ForbiddenError } from '../../domain/shared/http-errors';
+import { canAccessTeamChat } from '../../domain/permission/permission.policy';
 import type { ScheduleRepository } from '../../domain/schedule/schedule.repository';
 import type { TeamRepository } from '../../domain/team/team.repository';
 import type { ChatRepository } from '../../domain/chat/chat.repository';
@@ -88,11 +89,30 @@ export function createChatGateway(
         if (!command) return;
 
         if (command.type === 'join') {
-          if (subscribedScheduleId) {
-            broadcaster.unsubscribe(subscribedScheduleId, socket);
+          try {
+            // 구독도 메시지 전송·이력 조회와 동일한 팀 소속 권한이 필요하다.
+            // 인증만 된 다른 팀 사용자가 scheduleId를 추측해 실시간 메시지를
+            // 수신하는 것을 막는다.
+            const schedule = await deps.scheduleRepository.findById(command.scheduleId);
+            if (!schedule) {
+              throw new NotFoundError('SCHEDULE_NOT_FOUND', '일정을 찾을 수 없습니다.');
+            }
+            const membership = await deps.teamRepository.findMembership(
+              schedule.teamId,
+              reAuth.userId,
+            );
+            if (!canAccessTeamChat(membership?.role ?? null)) {
+              throw new ForbiddenError('FORBIDDEN', '해당 채팅에 접근할 권한이 없습니다.');
+            }
+
+            if (subscribedScheduleId) {
+              broadcaster.unsubscribe(subscribedScheduleId, socket);
+            }
+            subscribedScheduleId = command.scheduleId;
+            broadcaster.subscribe(subscribedScheduleId, socket);
+          } catch (error) {
+            socket.send(JSON.stringify({ type: 'error', ...errorPayload(error) }));
           }
-          subscribedScheduleId = command.scheduleId;
-          broadcaster.subscribe(subscribedScheduleId, socket);
           return;
         }
 

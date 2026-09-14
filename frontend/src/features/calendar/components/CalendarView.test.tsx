@@ -86,7 +86,7 @@ vi.mock('./ScheduleForm', () => ({
     teamId: string;
     mode: 'create' | 'edit';
     schedule?: Schedule | null;
-    onSaved(schedule: Schedule): void;
+    onSaved(schedule: Schedule, hasConflicts?: boolean): void;
     onDeleted?(scheduleId: string): void;
     onCancel(): void;
   }) => (
@@ -107,6 +107,26 @@ vi.mock('./ScheduleForm', () => ({
         }
       >
         저장
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          props.onSaved(
+            {
+              id: props.schedule ? props.schedule.id : 'new-id',
+              teamId: props.teamId,
+              title: '저장됨(충돌)',
+              startAt: '2026-04-15T00:00:00.000Z',
+              endAt: '2026-04-15T01:00:00.000Z',
+              createdAt: '2026-04-01T00:00:00.000Z',
+              deletedAt: null,
+              participants: [],
+            },
+            true,
+          )
+        }
+      >
+        저장(충돌)
       </button>
       <button
         type="button"
@@ -345,6 +365,25 @@ describe('CalendarView', () => {
       expect(refresh).toHaveBeenCalled();
     });
     expect(screen.queryByTestId('schedule-form')).not.toBeInTheDocument();
+  });
+
+  it('ScheduleForm의 onSaved가 hasConflicts=true로 호출되면 폼을 닫지 않고 mode를 edit으로 전환해 재저장 시 중복 생성을 막는다', async () => {
+    const user = userEvent.setup();
+    const { refresh } = setupDefaults();
+    renderView();
+
+    await user.click(screen.getByRole('button', { name: '생성' }));
+    expect(screen.getByTestId('schedule-form')).toHaveAttribute('data-mode', 'create');
+
+    await user.click(screen.getByRole('button', { name: '저장(충돌)' }));
+
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled();
+    });
+    const form = screen.getByTestId('schedule-form');
+    expect(form).toBeInTheDocument();
+    expect(form).toHaveAttribute('data-mode', 'edit');
+    expect(form).toHaveAttribute('data-schedule-id', 'new-id');
   });
 
   it('ScheduleForm의 onDeleted가 호출되면 refresh를 호출하고 폼을 닫는다', async () => {

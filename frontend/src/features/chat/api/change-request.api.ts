@@ -1,4 +1,4 @@
-import { post } from '../../../shared/api/http-client';
+import { get, post } from '../../../shared/api/http-client';
 import type {
   ChangeRequest,
   SubmitChangeRequestRequest,
@@ -10,6 +10,10 @@ export function submitChangeRequest(
   body: SubmitChangeRequestRequest,
 ): Promise<ChangeRequest> {
   return post<ChangeRequest>(`/schedules/${scheduleId}/change-requests`, body);
+}
+
+export function listChangeRequests(scheduleId: string): Promise<ChangeRequest[]> {
+  return get<ChangeRequest[]>(`/schedules/${scheduleId}/change-requests`);
 }
 
 export function approveChangeRequest(id: string): Promise<ChangeRequest> {

@@ -9,6 +9,7 @@ export function fakeChangeRequestRepository(
     findById: vi.fn(),
     approve: vi.fn(),
     reject: vi.fn(),
+    listBySchedule: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
 }

@@ -17,6 +17,18 @@ export interface TeamMembership {
   createdAt: string;
 }
 
+export type TeamJoinRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+// 팀 가입은 즉시 멤버십을 만들지 않는다. 팀장이 승인할 때만 MEMBER가 된다.
+export interface TeamJoinRequest {
+  id: string;
+  teamId: string;
+  requesterUserId: string;
+  status: TeamJoinRequestStatus;
+  createdAt: string;
+  decidedAt: string | null;
+}
+
 // GET /teams/{teamId}/members 전용 조인 결과(team_memberships + users).
 export interface TeamMember {
   userId: string;

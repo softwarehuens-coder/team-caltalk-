@@ -27,4 +27,7 @@ export interface ChangeRequestRepository {
   // ChangeRequest.reason 설명대로 이 컬럼은 "제출 시 입력한 사유"용이며, 거절 사유는
   // 해당 일정 채팅의 통지 메시지로만 기록된다(application 계층 책임).
   reject(changeRequestId: string): Promise<ChangeRequest | null>;
+  // 상태 무관 전체 조회(대기중/승인됨/거절됨) — 채팅 패널이 일정별 변경요청 이력을
+  // 재구성할 때 사용한다(제출자 탭에만 남는 로컬 state가 아니라 서버가 SSOT).
+  listBySchedule(scheduleId: string): Promise<ChangeRequest[]>;
 }

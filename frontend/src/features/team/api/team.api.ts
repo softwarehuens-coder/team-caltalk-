@@ -15,6 +15,10 @@ export function createTeam(payload: CreateTeamRequest): Promise<Team> {
   return post<Team>('/teams', payload);
 }
 
+export function getTeam(teamId: string): Promise<Team> {
+  return get<Team>(`/teams/${teamId}`);
+}
+
 export function inviteTeamMember(
   teamId: string,
   payload: InviteTeamMemberRequest,

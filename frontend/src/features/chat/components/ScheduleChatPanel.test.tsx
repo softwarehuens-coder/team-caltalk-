@@ -35,11 +35,17 @@ vi.mock('../api/change-request.api', () => ({
   submitChangeRequest: vi.fn(),
   approveChangeRequest: vi.fn(),
   rejectChangeRequest: vi.fn(),
+  listChangeRequests: vi.fn(),
 }));
 
 import { ScheduleChatPanel } from './ScheduleChatPanel';
 import { getScheduleMessages } from '../api/chat.api';
-import { submitChangeRequest, approveChangeRequest, rejectChangeRequest } from '../api/change-request.api';
+import {
+  submitChangeRequest,
+  approveChangeRequest,
+  rejectChangeRequest,
+  listChangeRequests,
+} from '../api/change-request.api';
 
 const members: TeamMember[] = [
   { userId: 'u1', email: 'leader@test.com', name: '홍길동', role: 'LEADER', joinedAt: '2026-01-01T00:00:00.000Z' },
@@ -134,6 +140,7 @@ function emptyHistoryPage(): PaginatedChatMessages {
 
 beforeEach(() => {
   vi.mocked(getScheduleMessages).mockResolvedValue(emptyHistoryPage());
+  vi.mocked(listChangeRequests).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -757,6 +764,29 @@ describe('ScheduleChatPanel - 변경 요청 승인/거절 (FE-8)', () => {
     expect(await screen.findByText('[변경 요청 - 대기중]')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '거절' })).not.toBeInTheDocument();
+  });
+
+  it('다른 탭(멤버)이 제출한 PENDING 변경 요청도 서버 조회로 팀장 화면에 처음부터 보인다 (교차 세션 가시성 회귀 테스트)', async () => {
+    // 이 테스트는 로컬 state가 아니라 listChangeRequests(GET /schedules/{id}/change-requests) 서버
+    // 응답만으로 팀장 화면에 승인/거절 UI가 뜨는지 검증한다 — submitChangeRequest를 이 컴포넌트
+    // 인스턴스에서 전혀 호출하지 않는다(= 실제로 다른 브라우저 탭에서 제출된 상황을 재현).
+    const pendingFromAnotherTab = buildChangeRequest({ id: 'cr-remote', status: 'PENDING' });
+    vi.mocked(listChangeRequests).mockResolvedValue([pendingFromAnotherTab]);
+
+    render(
+      <ScheduleChatPanel
+        schedule={scheduleA}
+        members={members}
+        isLeader={true}
+        onClose={vi.fn()}
+        onEditClick={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText('[변경 요청 - 대기중]')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '승인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '거절' })).toBeInTheDocument();
+    expect(vi.mocked(submitChangeRequest)).not.toHaveBeenCalled();
   });
 
   it('승인 클릭 시 approveChangeRequest API가 호출되고 상태가 APPROVED로 변경되며 콜백들이 실행된다', async () => {

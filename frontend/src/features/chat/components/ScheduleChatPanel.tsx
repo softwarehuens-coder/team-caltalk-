@@ -6,6 +6,7 @@ import type { TeamMember } from '../../../shared/types/team.types';
 import type { ChangeRequest } from '../../../shared/types/change-request.types';
 import { useChatSocket, type ChatConnectionStatus } from '../hooks/use-chat-socket';
 import { getScheduleMessages } from '../api/chat.api';
+import { listChangeRequests } from '../api/change-request.api';
 import { ApiError } from '../../../shared/api/api-error';
 import { ChangeRequestForm } from './ChangeRequestForm';
 import { ChangeRequestApproval } from './ChangeRequestApproval';
@@ -132,6 +133,16 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
         if (cancelled) return;
         setHistoryError(error instanceof ApiError ? error : new ApiError(0, 'UNKNOWN', '채팅 이력을 불러오지 못했습니다.'));
         setIsLoadingHistory(false);
+      });
+    // 변경 요청은 제출자 탭의 로컬 state에만 남으면 팀장이 새로고침/재접속 시 대기중
+    // 요청을 영원히 볼 수 없다 — 서버를 SSOT로 삼아 매번 다시 조회한다.
+    listChangeRequests(schedule.id)
+      .then((result) => {
+        if (cancelled) return;
+        setPendingChangeRequests(result);
+      })
+      .catch((error) => {
+        console.error('Failed to load change requests:', error);
       });
     return () => {
       cancelled = true;

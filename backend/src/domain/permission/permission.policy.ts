@@ -16,6 +16,11 @@ export function canInviteTeamMember(role: TeamRole | null): boolean {
   return role === 'LEADER';
 }
 
+// 가입 요청 승인도 팀 권한을 바꾸는 작업이므로 팀장만 할 수 있다.
+export function canApproveTeamJoin(role: TeamRole | null): boolean {
+  return role === 'LEADER';
+}
+
 // 5장 "팀장 위임" — 현재 팀장만 팀장 역할을 다른 팀원에게 위임할 수 있다.
 export function canDelegateLeader(role: TeamRole | null): boolean {
   return role === 'LEADER';
