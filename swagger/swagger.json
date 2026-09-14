@@ -10,8 +10,8 @@
   },
   "servers": [
     {
-      "url": "http://localhost:3000",
-      "description": "로컬 개발 서버 (placeholder)"
+      "url": "http://localhost:3001",
+      "description": "실제 백엔드 서버 (backend/src, PORT 환경변수, 기본값 3001). 이 서버가 /docs에서 이 문서 자체를 서빙한다."
     }
   ],
   "security": [
@@ -71,6 +71,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "409": {
             "description": "이미 등록된 이메일",
             "content": {
@@ -106,6 +107,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": {
             "description": "이메일 또는 비밀번호 불일치",
             "content": {
@@ -140,7 +142,32 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/teams/{teamId}": {
+      "get": {
+        "tags": ["Teams"],
+        "summary": "팀 단건 조회",
+        "description": "팀 소속 사용자만 조회 가능(팀장/팀원 공통, list-team-members와 동일한 인가). 가입 요청이 승인된 뒤 팀 이름을 알 방법이 없어 팀 화면에 영구히 진입할 수 없던 FE-2 갭을 해결하기 위해 추가되었다 — 팀 ID로 재가입을 시도해 409(ALREADY_MEMBER)를 받은 클라이언트가 이 엔드포인트로 팀 이름을 얻어 로컬 팀 컨텍스트를 설정한다.",
+        "operationId": "getTeam",
+        "parameters": [
+          { "$ref": "#/components/parameters/TeamId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Team" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
@@ -148,7 +175,7 @@
       "post": {
         "tags": ["Teams"],
         "summary": "팀원 초대 (팀장 전용)",
-        "description": "BE-4. LEADER만 이메일로 팀원을 초대할 수 있다(`canInviteTeamMember`, permission.policy.ts SSOT). 실제 팀 소속은 초대받은 사용자가 `POST /teams/{teamId}/join`을 호출해야 확정된다 — schema.sql에는 별도 invitations 테이블이 없으므로 이 응답은 팀 소속을 영속화하지 않는, 초대 발신 확인용 응답이다(설계 의도 문서에 세부 스키마가 명시되지 않아 판단한 부분).",
+        "description": "LEADER만 이메일로 팀원을 초대할 수 있다. 현재 초대 응답은 발신 확인용이며, 실제 팀 소속은 초대받은 사용자의 가입 요청을 팀장이 승인할 때만 확정된다.",
         "operationId": "inviteTeamMember",
         "parameters": [
           { "$ref": "#/components/parameters/TeamId" }
@@ -170,6 +197,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -179,15 +207,46 @@
     "/teams/{teamId}/join": {
       "post": {
         "tags": ["Teams"],
-        "summary": "팀 가입",
-        "description": "BE-4. 인증된 사용자가 팀에 MEMBER로 가입한다(도메인 정의서 5장 \"팀원 초대/가입\").",
+        "summary": "팀 가입 요청",
+        "description": "인증된 사용자가 팀 가입 요청을 생성한다. 요청 상태는 PENDING이며, 팀장이 승인할 때까지 팀 멤버 권한은 부여되지 않는다.",
         "operationId": "joinTeam",
         "parameters": [
           { "$ref": "#/components/parameters/TeamId" }
         ],
         "responses": {
+          "202": {
+            "description": "가입 요청 접수",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TeamJoinRequest" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": {
+            "description": "이미 해당 팀에 소속되었거나 대기 중인 가입 요청이 있음",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/join-requests/{requestId}/approve": {
+      "post": {
+        "tags": ["Teams"],
+        "summary": "팀 가입 요청 승인 (팀장 전용)",
+        "description": "PENDING 가입 요청을 승인하고 요청자를 MEMBER로 등록한다. 상태 전이와 멤버십 생성은 하나의 트랜잭션으로 처리된다.",
+        "operationId": "approveTeamJoinRequest",
+        "parameters": [
+          { "$ref": "#/components/parameters/RequestId" }
+        ],
+        "responses": {
           "201": {
-            "description": "가입 성공",
+            "description": "가입 요청 승인 및 팀원 등록 성공",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/TeamMembership" }
@@ -195,15 +254,35 @@
             }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
-          "409": {
-            "description": "이미 해당 팀에 소속됨",
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/teams/{teamId}/join-requests": {
+      "get": {
+        "tags": ["Teams"],
+        "summary": "대기 중인 팀 가입 요청 조회 (팀장 전용)",
+        "operationId": "listPendingTeamJoinRequests",
+        "parameters": [
+          { "$ref": "#/components/parameters/TeamId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "대기 중인 가입 요청 목록",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/TeamJoinRequest" }
+                }
               }
             }
-          }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
@@ -267,6 +346,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "409": {
@@ -311,7 +391,7 @@
       "get": {
         "tags": ["Schedules"],
         "summary": "팀 일정 조회 (월/주/일)",
-        "description": "BE-5, UC2/UC4, SC1. 소프트 삭제되지 않은(`deleted_at IS NULL`) 일정만 반환하며, 기간을 하드코딩으로 제한하지 않는다(과거/현재/미래 전체 조회 가능).",
+        "description": "BE-5, UC2/UC4, SC1. 소프트 삭제되지 않은(`deleted_at IS NULL`) 일정만 반환하며, 기간을 하드코딩으로 제한하지 않는다(과거/현재/미래 전체 조회 가능). `view`/`date`는 현재 구현(`list-team-schedules.usecase.ts`)에서 요청 형식 검증에만 사용되며, 조회 결과 자체는 필터링하지 않고 팀의 모든 활성 일정을 반환한다(SC1 불변조건).",
         "operationId": "listTeamSchedules",
         "parameters": [
           { "$ref": "#/components/parameters/TeamId" },
@@ -342,6 +422,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -350,7 +431,7 @@
       "post": {
         "tags": ["Schedules"],
         "summary": "일정 생성 (팀장 전용)",
-        "description": "BE-5, UC3. LEADER만 생성 가능(`canEditSchedule`). 생성과 동시에 대응하는 `chats` 행이 1개 자동 생성된다(BE-6 연동). `conflictWarnings`는 BE-10(Should, UC9/SC4) 구현 전까지 항상 빈 배열로 반환되는 스텁이다.",
+        "description": "BE-5, UC3. LEADER만 생성 가능(`canEditSchedule`). 생성과 동시에 대응하는 `chats` 행이 1개 자동 생성된다(BE-6 연동). BE-10(UC9/SC4)이 구현되어 있어 `conflictWarnings`는 겹치는 시간대에 동일 참여자가 있으면 실제 경고로 채워진다(`schedule-conflict.ts`) — 경고가 있어도 저장 자체는 차단되지 않는다.",
         "operationId": "createSchedule",
         "parameters": [
           { "$ref": "#/components/parameters/TeamId" }
@@ -372,6 +453,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -382,7 +464,7 @@
       "put": {
         "tags": ["Schedules"],
         "summary": "일정 수정 (팀장 전용)",
-        "description": "BE-5, UC3. LEADER만 수정 가능(`canEditSchedule`). `conflictWarnings`는 BE-10 이전까지 항상 빈 배열이다(UC9/SC4).",
+        "description": "BE-5, UC3. LEADER만 수정 가능(`canEditSchedule`). BE-10(UC9/SC4)이 구현되어 있어 `conflictWarnings`는 실제 경고로 채워지며(자기 자신은 비교 대상에서 제외), 경고가 있어도 저장은 차단되지 않는다.",
         "operationId": "updateSchedule",
         "parameters": [
           { "$ref": "#/components/parameters/TeamId" },
@@ -405,6 +487,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -459,6 +542,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -469,7 +553,7 @@
       "post": {
         "tags": ["ChangeRequests"],
         "summary": "일정 변경 요청 제출 (팀원, UC6)",
-        "description": "BE-7. 해당 일정의 참여자만 제출 가능(`canSubmitChangeRequest`, 비참여자는 403). 생성 시 `status=PENDING`으로 저장된다.",
+        "description": "BE-7. MEMBER 역할이면서 해당 일정의 참여자인 경우만 제출 가능(`canSubmitChangeRequest`가 MEMBER만 허용 + 참여자 목록 확인, 비참여자/팀장은 403). 생성 시 `status=PENDING`으로 저장된다.",
         "operationId": "submitChangeRequest",
         "parameters": [
           { "$ref": "#/components/parameters/ScheduleId" }
@@ -488,6 +572,32 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ChangeRequest" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "get": {
+        "tags": ["ChangeRequests"],
+        "summary": "일정별 변경 요청 전체 조회 (상태 무관, UC7 보조)",
+        "description": "BE-7. canAccessTeamChat과 동일하게 팀 소속이면 팀장/팀원 모두 조회 가능. 변경 요청 제출은 WS 브로드캐스트도, 채팅 메시지 기록도 하지 않아(승인/거절 시에만 통지 메시지가 기록됨) 제출자 탭의 로컬 state에만 남아 팀장이 영원히 대기중 요청을 볼 수 없던 버그를 해결하기 위해 추가되었다 — 채팅 패널이 이력 조회와 함께 이 엔드포인트를 호출해 PENDING/APPROVED/REJECTED 요청을 모두 재구성한다.",
+        "operationId": "listChangeRequests",
+        "parameters": [
+          { "$ref": "#/components/parameters/ScheduleId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공(생성 시각 오름차순)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ChangeRequest" }
+                }
               }
             }
           },
@@ -555,6 +665,7 @@
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
@@ -575,7 +686,7 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "BE-2 `auth.middleware.ts`가 검증하는 토큰. `/health`, `/auth/register`, `/auth/login`을 제외한 모든 엔드포인트에 필요하다. 구체적 토큰 형식(JWT vs 세션 등)은 6-tech-stack.md 6장에서 별도 문서로 미룬 세부 기술 설계 사항이라 이 스펙에서 확정하지 않는다."
+        "description": "BE-2 `auth.middleware.ts`가 검증하는 JWT(`jsonwebtoken`, 기본 HS256, 24시간 만료 — `infrastructure/auth/jwt-token.service.ts`). `POST /auth/login` 응답의 `token` 필드로 발급되며, `/health`, `/auth/register`, `/auth/login`을 제외한 모든 엔드포인트에 필요하다."
       }
     },
     "parameters": {
@@ -604,9 +715,24 @@
         "required": true,
         "description": "변경 요청 ID",
         "schema": { "type": "string", "format": "uuid" }
+      },
+      "RequestId": {
+        "name": "requestId",
+        "in": "path",
+        "required": true,
+        "description": "팀 가입 요청 ID",
+        "schema": { "type": "string", "format": "uuid" }
       }
     },
     "responses": {
+      "BadRequest": {
+        "description": "요청 형식이 올바르지 않음(필수 필드 누락, 타입 불일치 등). 각 라우트가 `presentation` 계층에서 직접 검증하며 `code: \"INVALID_REQUEST\"`로 응답한다.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
       "Unauthorized": {
         "description": "인증되지 않음(토큰 누락/무효)",
         "content": {
@@ -625,6 +751,14 @@
       },
       "NotFound": {
         "description": "리소스를 찾을 수 없음",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "현재 리소스 상태와 요청이 충돌함(예: 이미 처리된 가입 요청)",
         "content": {
           "application/json": {
             "schema": { "$ref": "#/components/schemas/ErrorResponse" }
@@ -698,7 +832,7 @@
         "type": "object",
         "required": ["name"],
         "properties": {
-          "name": { "type": "string", "example": "디자인팀" }
+          "name": { "type": "string", "minLength": 1, "example": "디자인팀" }
         }
       },
       "InviteTeamMemberRequest": {
@@ -710,7 +844,7 @@
       },
       "InvitationResponse": {
         "type": "object",
-        "description": "초대 발신 확인 응답. schema.sql에 별도 invitations 테이블이 없으므로 팀 소속 자체는 영속화하지 않으며, 실제 소속은 초대받은 사용자가 POST /teams/{teamId}/join을 호출해야 확정된다.",
+        "description": "초대 발신 확인 응답. 이 응답은 팀 소속 권한을 부여하지 않으며, 가입 요청의 팀장 승인 후에만 MEMBER가 된다.",
         "required": ["teamId", "invitedEmail", "invitedAt"],
         "properties": {
           "teamId": { "type": "string", "format": "uuid" },
@@ -727,6 +861,19 @@
           "userId": { "type": "string", "format": "uuid" },
           "role": { "$ref": "#/components/schemas/TeamRole" },
           "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "TeamJoinRequest": {
+        "type": "object",
+        "description": "팀장 승인 전에는 권한을 부여하지 않는 팀 가입 요청",
+        "required": ["id", "teamId", "requesterUserId", "status", "createdAt", "decidedAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "teamId": { "type": "string", "format": "uuid" },
+          "requesterUserId": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "decidedAt": { "type": ["string", "null"], "format": "date-time" }
         }
       },
       "TeamRole": {
@@ -833,7 +980,7 @@
       },
       "ScheduleCreateResponse": {
         "type": "object",
-        "description": "일정 생성/수정 응답 공통 형태. conflictWarnings는 BE-10(UC9/SC4) 구현 전까지 항상 빈 배열이다(저장 자체는 차단되지 않음).",
+        "description": "일정 생성/수정 응답 공통 형태. conflictWarnings는 BE-10(UC9/SC4, schedule-conflict.ts)의 실제 판정 결과이며, 경고가 있어도 저장 자체는 차단되지 않는다.",
         "required": ["schedule", "conflictWarnings"],
         "properties": {
           "schedule": { "$ref": "#/components/schemas/Schedule" },

@@ -6,6 +6,9 @@
 -- 최종수정일: 2026-09-09
 --
 -- 변경 이력:
+--   v1.5 — 보안 검토 결과에 따라 팀 가입을 즉시 멤버십으로 전환하지 않고,
+--          team_join_requests의 PENDING 요청을 팀장이 승인할 때만 MEMBER를
+--          생성하도록 변경. 기존 DB에는 아래 CREATE TABLE/INDEX 문을 적용한다.
 --   v1.4 — DB-4(docs/7-execution-plan.md) 판단에 따라 마이그레이션 정책을
 --          본 파일에 명문화(스키마 변경 없음, 문서 전용 변경). 아래
 --          "마이그레이션 정책" 절 참조. CLAUDE.md의 과거 서술을 대체한다.
@@ -129,6 +132,28 @@ CREATE UNIQUE INDEX uq_team_memberships_one_leader_per_team
 
 CREATE INDEX ix_team_memberships_team_id ON team_memberships (team_id);
 CREATE INDEX ix_team_memberships_user_id ON team_memberships (user_id);
+
+-- =============================================================================
+-- team_join_requests — 팀 가입 요청
+-- =============================================================================
+-- 인증된 사용자의 요청 자체는 소속 권한을 부여하지 않는다. 팀장이 PENDING 요청을
+-- APPROVED로 전이하고 team_memberships 행을 생성하는 단일 트랜잭션이 필요하다.
+CREATE TABLE team_join_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id UUID NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
+    requester_user_id UUID NOT NULL REFERENCES users (id),
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    decided_at TIMESTAMPTZ NULL,
+    CONSTRAINT ck_team_join_requests_status CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED'))
+);
+
+-- 같은 사용자가 동일 팀에 여러 개의 미처리 요청을 쌓아 승인 흐름을 우회하거나
+-- 운영자에게 과도한 요청을 보내지 못하게 한다.
+CREATE UNIQUE INDEX uq_team_join_requests_one_pending_per_user
+    ON team_join_requests (team_id, requester_user_id)
+    WHERE status = 'PENDING';
+CREATE INDEX ix_team_join_requests_team_id ON team_join_requests (team_id);
 
 -- =============================================================================
 -- schedules — 7-erd.md 2장/3장 SCHEDULE, 4장 "Team — Schedule 1:N" 근거
