@@ -37,7 +37,12 @@ export async function createTeamWithMembers(
   const teamId = createTeam.body.id;
 
   for (const member of members) {
-    await request(app).post(`/teams/${teamId}/join`).set('Authorization', `Bearer ${member.token}`);
+    const join = await request(app)
+      .post(`/teams/${teamId}/join`)
+      .set('Authorization', `Bearer ${member.token}`);
+    await request(app)
+      .post(`/teams/join-requests/${join.body.id}/approve`)
+      .set('Authorization', `Bearer ${leader.token}`);
   }
 
   return teamId;

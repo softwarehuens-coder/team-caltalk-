@@ -115,9 +115,14 @@ describe('채팅 웹소켓 게이트웨이 (통합)', () => {
     const listener = new WebSocket(`${baseUrl}?token=${token}`);
     await Promise.all([waitForOpen(sender), waitForOpen(listener)]);
 
+    // 'join'은 서버 쪽에서 findById/findMembership 두 번의 DB 왕복을 거친 뒤에야
+    // 실제로 구독이 등록된다(비동기). 이 테스트는 그 완료를 알려주는 ack가 프로토콜에
+    // 없으므로, 두 소켓 모두의 구독이 확실히 끝날 시간을 넉넉히 준다 — 짧은 고정
+    // 대기(과거 50ms)로는 두 번째 join의 DB 왕복이 끝나기 전에 메시지가 전송되어
+    // 리스너가 브로드캐스트를 놓치는 레이스가 실제로 재현되었다(간헐적 타임아웃).
     sender.send(JSON.stringify({ type: 'join', scheduleId }));
     listener.send(JSON.stringify({ type: 'join', scheduleId }));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     const received = waitForMessage(listener);
     sender.send(JSON.stringify({ type: 'message', scheduleId, content: 'WS 실시간 메시지' }));

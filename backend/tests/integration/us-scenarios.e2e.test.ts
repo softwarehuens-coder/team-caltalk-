@@ -69,8 +69,17 @@ describe('US 시나리오 대표 E2E 테스트 (MVP 범위)', () => {
     const join2 = await request(app)
       .post(`/teams/${teamId}/join`)
       .set('Authorization', `Bearer ${member2.token}`);
-    expect(join1.status).toBe(201);
-    expect(join2.status).toBe(201);
+    expect(join1.status).toBe(202);
+    expect(join2.status).toBe(202);
+
+    const approve1 = await request(app)
+      .post(`/teams/join-requests/${join1.body.id}/approve`)
+      .set('Authorization', `Bearer ${leader.token}`);
+    const approve2 = await request(app)
+      .post(`/teams/join-requests/${join2.body.id}/approve`)
+      .set('Authorization', `Bearer ${leader.token}`);
+    expect(approve1.status).toBe(201);
+    expect(approve2.status).toBe(201);
 
     const members = await request(app)
       .get(`/teams/${teamId}/members`)
