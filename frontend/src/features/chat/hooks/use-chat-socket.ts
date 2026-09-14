@@ -22,10 +22,11 @@ const AUTH_EXPIRED_CLOSE_CODE = 4401;
 const INTENTIONAL_CLOSE_CODE = 1000;
 const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30000;
+const WS_BASE_PATH = import.meta.env.VITE_WS_BASE_URL ?? '/ws';
 
 function buildSocketUrl(token: string | null): string {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${protocol}://${window.location.host}/ws/chat?token=${encodeURIComponent(token ?? '')}`;
+  return `${protocol}://${window.location.host}${WS_BASE_PATH}/chat?token=${encodeURIComponent(token ?? '')}`;
 }
 
 function sendFrame(socket: WebSocket, frame: ChatSocketClientFrame): void {
