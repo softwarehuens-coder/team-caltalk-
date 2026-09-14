@@ -25,7 +25,10 @@ export async function approveJoinRequest(
 
   const approvedMembership = await teamRepository.approveJoinRequest(request.teamId, request.id);
   if (!approvedMembership) {
-    throw new ConflictError('JOIN_REQUEST_NOT_PENDING', '이미 처리되었거나 유효하지 않은 가입 요청입니다.');
+    throw new ConflictError(
+      'JOIN_REQUEST_NOT_PENDING',
+      '이미 처리되었거나 유효하지 않은 가입 요청입니다.',
+    );
   }
 
   return approvedMembership;

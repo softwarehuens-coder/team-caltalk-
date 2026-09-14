@@ -46,7 +46,10 @@ describe('채팅 웹소켓 게이트웨이 (통합)', () => {
 
   beforeAll(async () => {
     userId = await createTestUser(`be8-gateway-${Date.now()}@example.com`, '통합테스트유저');
-    outsiderUserId = await createTestUser(`be8-outsider-${Date.now()}@example.com`, '외부테스트유저');
+    outsiderUserId = await createTestUser(
+      `be8-outsider-${Date.now()}@example.com`,
+      '외부테스트유저',
+    );
     const { team } = await teamRepository.createTeamWithLeader('BE-8 통합테스트팀', userId);
     teamId = team.id;
 

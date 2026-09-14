@@ -146,9 +146,16 @@ export class PostgresTeamRepository implements TeamRepository {
       );
       return toJoinRequest(result.rows[0]);
     } catch (error) {
-      if (typeof error === 'object' && error !== null && 'code' in error &&
-          (error as { code?: string }).code === '23505') {
-        throw new ConflictError('JOIN_REQUEST_ALREADY_PENDING', '이미 처리 대기 중인 가입 요청이 있습니다.');
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: string }).code === '23505'
+      ) {
+        throw new ConflictError(
+          'JOIN_REQUEST_ALREADY_PENDING',
+          '이미 처리 대기 중인 가입 요청이 있습니다.',
+        );
       }
       throw error;
     }
