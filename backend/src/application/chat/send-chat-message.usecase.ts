@@ -11,9 +11,9 @@ export interface SendChatMessageInput {
   content: string;
 }
 
-// UC5(BE-8, chat.gateway.ts 경유). list-chat-history.usecase.ts(BE-6, REST)와 동일한
-// canAccessTeamChat(permission.policy.ts SSOT)을 그대로 재사용한다 — 권한 판단을
-// WebSocket 쪽에서 재구현하지 않는다(이슈 #34 BE-8 기술적 고려사항).
+// UC5(REST POST, chat.routes.ts 경유 — 과거 WebSocket chat.gateway.ts에서 롱폴링
+// 전환으로 이관됨). list-chat-history.usecase.ts(UC8)와 동일한
+// canAccessTeamChat(permission.policy.ts SSOT)을 그대로 재사용한다.
 export async function sendChatMessage(
   scheduleRepository: ScheduleRepository,
   teamRepository: TeamRepository,

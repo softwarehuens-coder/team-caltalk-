@@ -5,8 +5,7 @@ import { PostgresScheduleRepository } from './db/postgres/schedule.repository.im
 import { PostgresChatRepository } from './db/postgres/chat.repository.impl';
 import { PostgresChangeRequestRepository } from './db/postgres/change-request.repository.impl';
 
-// createApp(HTTP 라우트)과 chat.gateway.ts(WebSocket)이 동일한 리포지토리 인스턴스
-// 구성을 공유해야 하므로(같은 pool을 감싸는 동일 구현체) 한 곳에서 조립한다.
+// createApp(HTTP 라우트)이 사용하는 리포지토리 인스턴스를 한 곳에서 조립한다.
 export function createRepositories(pool: Pool) {
   return {
     userRepository: new PostgresUserRepository(pool),
