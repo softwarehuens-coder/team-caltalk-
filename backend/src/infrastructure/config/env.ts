@@ -7,6 +7,7 @@ export interface EnvConfig {
   postgresConnectionString: string;
   port: number;
   jwtSecret: string;
+  corsOrigin?: string;
 }
 
 function requireEnv(name: string): string {
@@ -22,5 +23,6 @@ export function loadEnv(): EnvConfig {
     postgresConnectionString: requireEnv('POSTGRES_CONNECTION_STRING'),
     port: Number(process.env.PORT ?? 3001),
     jwtSecret: requireEnv('JWT_SECRET'),
+    corsOrigin: process.env.CORS_ORIGIN,
   };
 }
