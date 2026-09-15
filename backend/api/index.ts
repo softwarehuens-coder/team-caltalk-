@@ -9,7 +9,7 @@ import { createApp } from '../src/app';
 // 모듈 스코프에 두어 이후 웜 invocation에서 재사용한다.
 const env = loadEnv();
 const pool = createPool(env);
-const app = createApp(pool, env.jwtSecret);
+const app = createApp(pool, env.jwtSecret, env.corsOrigin);
 
 export default function handler(req: IncomingMessage, res: ServerResponse): void {
   app(req, res);
