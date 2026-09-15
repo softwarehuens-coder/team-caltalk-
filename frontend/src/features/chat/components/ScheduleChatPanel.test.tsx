@@ -8,19 +8,21 @@ import type { ChatMessage, PaginatedChatMessages } from '../../../shared/types/c
 import type { ChangeRequest } from '../../../shared/types/change-request.types';
 import { ApiError } from '../../../shared/api/api-error';
 
-type UseChatSocketOptions = {
+type UseChatPollingOptions = {
   scheduleId: string;
   token: string | null;
+  enabled: boolean;
+  initialCursor: string | null;
   onMessage(message: ChatMessage): void;
 };
 
-const useChatSocketMock = vi.fn();
+const useChatPollingMock = vi.fn();
 const useAuthMock = vi.fn();
 const logoutMock = vi.fn();
-const sendMessageMock = vi.fn().mockReturnValue(true);
+const sendMessageMock = vi.fn().mockResolvedValue(true);
 
-vi.mock('../hooks/use-chat-socket', () => ({
-  useChatSocket: (options: UseChatSocketOptions) => useChatSocketMock(options),
+vi.mock('../hooks/use-chat-polling', () => ({
+  useChatPolling: (options: UseChatPollingOptions) => useChatPollingMock(options),
 }));
 
 vi.mock('../../auth/hooks/use-auth', () => ({
@@ -103,7 +105,7 @@ function buildChangeRequest(overrides: Partial<ChangeRequest> = {}): ChangeReque
 }
 
 function setupChatSocket(status: 'connecting' | 'open' | 'reconnecting' | 'auth-expired' | 'closed' = 'open') {
-  useChatSocketMock.mockImplementation((options: UseChatSocketOptions) => ({
+  useChatPollingMock.mockImplementation((options: UseChatPollingOptions) => ({
     status,
     sendMessage: sendMessageMock,
     __options: options,
@@ -111,11 +113,11 @@ function setupChatSocket(status: 'connecting' | 'open' | 'reconnecting' | 'auth-
 }
 
 function lastOnMessage(): (message: ChatMessage) => void {
-  const lastCall = useChatSocketMock.mock.calls.at(-1);
+  const lastCall = useChatPollingMock.mock.calls.at(-1);
   if (!lastCall) {
-    throw new Error('useChatSocket이 호출되지 않았습니다');
+    throw new Error('useChatPolling이 호출되지 않았습니다');
   }
-  return (lastCall[0] as UseChatSocketOptions).onMessage;
+  return (lastCall[0] as UseChatPollingOptions).onMessage;
 }
 
 function renderPanel(props: Partial<Parameters<typeof ScheduleChatPanel>[0]> = {}) {

@@ -3,7 +3,7 @@
   "info": {
     "title": "Team CalTalk API",
     "version": "1.0.0",
-    "description": "Team CalTalk REST API 명세.\n\n**범위**: 이 문서는 REST(HTTP) 엔드포인트만 정의한다. 실시간 채팅 송수신(UC5)은 WebSocket 게이트웨이(`chat.gateway.ts`)를 통해서만 이루어지며 이 스펙의 범위 밖이다. 채팅 이력의 페이지네이션 조회(UC8)만 REST로 제공된다(`chat.routes.ts`).\n\n**필드 네이밍 규약**: 데이터베이스(`database/schema.sql`, snake_case, 예: `team_id`, `start_at`, `deleted_at`)와 JSON 요청/응답 바디(camelCase, 예: `teamId`, `startAt`, `deletedAt`)는 표기 규칙이 다르다. 두 표기 사이의 매핑은 인프라 계층(리포지토리 구현체)의 책임이며, 이 API는 항상 camelCase만 노출한다.\n\n**근거 문서**:\n- docs/2-PRD.md — UC1-UC9 사용자 스토리, SC1-SC4 성공 기준, MoSCoW 우선순위\n- docs/3-User-scenarios.md — US-01~US-08 구체적 시나리오\n- docs/5-arch-diagram.md — REST(팀/일정 CRUD, 채팅이력 조회) vs WebSocket(실시간 채팅) 역할 구분\n- docs/6-tech-stack.md — Node.js + TypeScript + Express, PostgreSQL\n- docs/7-execution-plan.md — BE-1~BE-10 태스크별 엔드포인트/필드 설계 의도 기록(1차 근거)\n- database/schema.sql (v1.3) — 데이터 모델 SSOT (8개 테이블)\n\n**인증**: `/health`, `/auth/register`, `/auth/login`을 제외한 모든 엔드포인트는 `Authorization: Bearer <token>` 헤더가 필요하다.",
+    "description": "Team CalTalk REST API 명세.\n\n**범위**: 이 문서는 REST(HTTP) 엔드포인트만 정의한다. 실시간 채팅 송수신(UC5)은 과거 WebSocket 게이트웨이(`chat.gateway.ts`)로 구현했으나, Vercel 서버리스 배포와 상시 연결 WebSocket이 맞지 않아 REST 롱폴링(`GET /schedules/{scheduleId}/messages/poll`)과 전송(`POST /schedules/{scheduleId}/messages`)으로 전환했다 — 이제 REST 스펙 범위 안이다(`chat.routes.ts`). 채팅 이력의 커서 기반 페이지네이션 조회(UC8)도 동일한 라우터가 제공한다.\n\n**필드 네이밍 규약**: 데이터베이스(`database/schema.sql`, snake_case, 예: `team_id`, `start_at`, `deleted_at`)와 JSON 요청/응답 바디(camelCase, 예: `teamId`, `startAt`, `deletedAt`)는 표기 규칙이 다르다. 두 표기 사이의 매핑은 인프라 계층(리포지토리 구현체)의 책임이며, 이 API는 항상 camelCase만 노출한다.\n\n**근거 문서**:\n- docs/2-PRD.md — UC1-UC9 사용자 스토리, SC1-SC4 성공 기준, MoSCoW 우선순위\n- docs/3-User-scenarios.md — US-01~US-08 구체적 시나리오\n- docs/5-arch-diagram.md — REST(팀/일정 CRUD, 채팅이력 조회, 실시간 채팅 롱폴링/전송) 역할 구분\n- docs/6-tech-stack.md — Node.js + TypeScript + Express, PostgreSQL\n- docs/7-execution-plan.md — BE-1~BE-10 태스크별 엔드포인트/필드 설계 의도 기록(1차 근거)\n- database/schema.sql (v1.3) — 데이터 모델 SSOT (8개 테이블)\n\n**인증**: `/health`, `/auth/register`, `/auth/login`을 제외한 모든 엔드포인트는 `Authorization: Bearer <token>` 헤더가 필요하다.",
     "contact": {
       "name": "Team CalTalk"
     }
@@ -24,7 +24,7 @@
     { "name": "Auth", "description": "인증 (UC1)" },
     { "name": "Teams", "description": "팀 라이프사이클 (생성/초대/가입/탈퇴/위임)" },
     { "name": "Schedules", "description": "일정 CRUD 및 조회 (UC2-UC4, UC9)" },
-    { "name": "Chat", "description": "일정별 채팅 이력 조회 (UC8, REST) — 실시간 송수신은 WebSocket(BE-8) 범위" },
+    { "name": "Chat", "description": "일정별 채팅 이력 조회(UC8), 실시간 롱폴링 수신/전송(UC5) — 모두 REST" },
     { "name": "ChangeRequests", "description": "일정 변경 요청 워크플로우 (UC6, UC7, SC3)" }
   ],
   "paths": {
@@ -513,8 +513,8 @@
     "/schedules/{scheduleId}/messages": {
       "get": {
         "tags": ["Chat"],
-        "summary": "일정별 채팅 이력 조회 (UC8, REST 전용)",
-        "description": "BE-6. 커서 기반 페이지네이션으로 시간순 채팅 이력을 조회한다. 실시간 송수신은 WebSocket(BE-8, `chat.gateway.ts`)이 담당하며 이 엔드포인트에는 포함되지 않는다. `canAccessTeamChat` 미통과 시 403, 조회 불가(팀 해체 등으로 일정 자체가 사라진 경우) 시 404. 일정이 소프트 삭제된 경우에도(SC2) 채팅 이력은 정상 조회된다(US-08).",
+        "summary": "일정별 채팅 이력 조회 (UC8)",
+        "description": "커서 기반 페이지네이션으로 시간순 채팅 이력을 조회한다. `canAccessTeamChat` 미통과 시 403, 조회 불가(팀 해체 등으로 일정 자체가 사라진 경우) 시 404. 일정이 소프트 삭제된 경우에도(SC2) 채팅 이력은 정상 조회된다(US-08).",
         "operationId": "listScheduleMessages",
         "parameters": [
           { "$ref": "#/components/parameters/ScheduleId" },
@@ -536,6 +536,76 @@
         "responses": {
           "200": {
             "description": "조회 성공",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedChatMessages" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Chat"],
+        "summary": "채팅 메시지 전송 (UC5, 실시간 송신)",
+        "description": "과거 WebSocket(`chat.gateway.ts`, 제거됨)이 담당하던 실시간 송신을 이관한 엔드포인트. `canAccessTeamChat`과 동일한 권한 판단을 재사용한다. 응답으로 저장된 메시지를 그대로 돌려줘, 발신자 자신은 다음 폴링 응답을 기다리지 않고 즉시 화면에 반영할 수 있다.",
+        "operationId": "sendScheduleMessage",
+        "parameters": [
+          { "$ref": "#/components/parameters/ScheduleId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendChatMessageRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "전송 성공",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ChatMessage" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/schedules/{scheduleId}/messages/poll": {
+      "get": {
+        "tags": ["Chat"],
+        "summary": "채팅 메시지 롱폴링 수신 (UC5, 실시간 수신)",
+        "description": "과거 WebSocket(`chat.gateway.ts`, 제거됨)이 담당하던 실시간 수신을 REST 롱폴링으로 이관한 엔드포인트. cursor 이후 새 메시지가 생길 때까지 서버가 최대 timeout(ms) 동안 응답을 들고 있다가, 새 메시지가 생기면 즉시 또는 timeout 경과 시 빈 결과로 응답한다. 클라이언트는 응답을 받는 즉시 반환된 데이터의 마지막 createdAt을 다음 cursor로 삼아 다시 요청한다(use-chat-polling.ts). Vercel 서버리스 함수의 최대 실행 시간 내에서 동작하도록 timeout 상한을 둔다.",
+        "operationId": "pollScheduleMessages",
+        "parameters": [
+          { "$ref": "#/components/parameters/ScheduleId" },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "이 시각 이후의 메시지만 조회한다. 생략 시 채팅의 첫 메시지부터 조회(초기 연결 시나리오).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "description": "새 메시지를 기다릴 최대 시간(ms). 상한을 넘으면 400.",
+            "schema": { "type": "integer", "minimum": 0, "maximum": 25000, "default": 25000 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "조회 성공(새 메시지가 없으면 data가 빈 배열)",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/PaginatedChatMessages" }
@@ -1019,6 +1089,13 @@
           "senderUserId": { "type": "string", "format": "uuid" },
           "content": { "type": "string" },
           "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SendChatMessageRequest": {
+        "type": "object",
+        "required": ["content"],
+        "properties": {
+          "content": { "type": "string" }
         }
       },
       "PaginatedChatMessages": {

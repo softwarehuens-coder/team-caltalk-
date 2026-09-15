@@ -4,7 +4,7 @@ import type { ChatMessage } from '../../../shared/types/chat.types';
 import type { Schedule } from '../../../shared/types/schedule.types';
 import type { TeamMember } from '../../../shared/types/team.types';
 import type { ChangeRequest } from '../../../shared/types/change-request.types';
-import { useChatSocket, type ChatConnectionStatus } from '../hooks/use-chat-socket';
+import { useChatPolling, type ChatConnectionStatus } from '../hooks/use-chat-polling';
 import { getScheduleMessages } from '../api/chat.api';
 import { listChangeRequests } from '../api/change-request.api';
 import { ApiError } from '../../../shared/api/api-error';
@@ -161,9 +161,11 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
       });
   };
 
-  const { status, sendMessage } = useChatSocket({
+  const { status, sendMessage } = useChatPolling({
     scheduleId: schedule.id,
     token,
+    enabled: !isLoadingHistory && !historyError,
+    initialCursor: messages.length > 0 ? messages[messages.length - 1].createdAt : null,
     onMessage: (message) =>
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message])),
   });
@@ -220,9 +222,12 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
     if (!trimmed || status !== 'open') {
       return;
     }
-    if (sendMessage(trimmed)) {
-      setContent('');
-    }
+    setContent('');
+    void sendMessage(trimmed).then((ok) => {
+      if (!ok) {
+        setContent(trimmed);
+      }
+    });
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
