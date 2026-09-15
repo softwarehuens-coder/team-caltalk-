@@ -38,11 +38,14 @@ export function createApp(pool: Pool, jwtSecret: string, corsOrigin?: string): E
 
   // API 계약 SSOT(swagger/swagger.json, docs/CLAUDE.md 참조)를 실제 서버에서도
   // 그대로 확인할 수 있도록 Swagger UI를 노출한다(mockup/server.js와 동일한 스펙 사용).
-  // process.cwd() 기준 경로를 쓴다 — 로컬(tsx)/Railway(node dist/server.js)/Vercel
-  // 서버리스 함수 모두 프로세스 시작 시 작업 디렉터리가 backend/이므로, 빌드 산출물이
-  // dist/에 있는지 번들된 함수 내부에 있는지(__dirname 깊이)와 무관하게 동일하게 동작한다.
+  // __dirname 기준 경로를 쓴다 — 로컬(tsx, src/app.ts)/Railway(node dist/server.js,
+  // dist/app.js)/Vercel 서버리스 함수(backend/src/app.js, 디렉터리 구조가 보존됨) 모두
+  // 이 파일은 backend/ 바로 아래 한 단계(src/ 또는 dist/)에 위치하므로 '..'로 backend/까지
+  // 한 번만 올라가면 동일하게 backend/swagger/swagger.json에 닿는다. 리터럴 경로라
+  // Vercel의 정적 분석(NFT)이 자동으로 번들에 포함시켜준다(process.cwd()는 Vercel에서
+  // 저장소 루트를 가리켜 backend/ 한 단계가 빠지는 문제가 있었다).
   const swaggerDocument = JSON.parse(
-    fs.readFileSync(path.join(process.cwd(), 'swagger', 'swagger.json'), 'utf-8'),
+    fs.readFileSync(path.join(__dirname, '..', 'swagger', 'swagger.json'), 'utf-8'),
   );
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 

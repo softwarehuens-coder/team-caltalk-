@@ -2,7 +2,7 @@
   "outputDirectory": "public",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "swagger/**",
+      "includeFiles": "swagger/swagger.json",
       "maxDuration": 30
     }
   },
