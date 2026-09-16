@@ -48,7 +48,7 @@ describe('apiRequest', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
-    localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('정상 응답(200)이면 JSON 본문을 그대로 반환한다', async () => {
