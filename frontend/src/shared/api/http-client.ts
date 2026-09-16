@@ -1,7 +1,10 @@
 import { ApiError, isErrorResponse } from './api-error';
 import { clearAuthToken, getAuthToken } from './token-storage';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
+// 끝에 '/'가 붙은 값(VITE_API_BASE_URL 설정 실수)이 경로와 합쳐질 때 '//auth/register'
+// 같은 이중 슬래시가 되는 것을 막는다 — 이중 슬래시는 Vercel에서 정규 경로로 리다이렉트되고,
+// 브라우저는 CORS preflight에 대한 리다이렉트를 허용하지 않아 요청 자체가 막힌다.
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/+$/, '');
 
 type UnauthorizedHandler = () => void;
 

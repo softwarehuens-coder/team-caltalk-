@@ -8,9 +8,17 @@ export interface AgendaListViewProps {
   days: Date[];
   schedulesByDay: Map<string, Schedule[]>;
   onScheduleClick(schedule: Schedule): void;
+  onScheduleEditClick?(schedule: Schedule): void;
+  onScheduleDeleteClick?(schedule: Schedule): void;
 }
 
-export function AgendaListView({ days, schedulesByDay, onScheduleClick }: AgendaListViewProps) {
+export function AgendaListView({
+  days,
+  schedulesByDay,
+  onScheduleClick,
+  onScheduleEditClick,
+  onScheduleDeleteClick,
+}: AgendaListViewProps) {
   return (
     <div className="flex flex-col gap-3">
       {days.map((day) => {
@@ -28,7 +36,13 @@ export function AgendaListView({ days, schedulesByDay, onScheduleClick }: Agenda
                 <p className="text-xs text-gray-400">일정 없음</p>
               ) : (
                 daySchedules.map((schedule) => (
-                  <ScheduleChip key={schedule.id} schedule={schedule} onClick={onScheduleClick} />
+                  <ScheduleChip
+                    key={schedule.id}
+                    schedule={schedule}
+                    onClick={onScheduleClick}
+                    onEditClick={onScheduleEditClick}
+                    onDeleteClick={onScheduleDeleteClick}
+                  />
                 ))
               )}
             </div>

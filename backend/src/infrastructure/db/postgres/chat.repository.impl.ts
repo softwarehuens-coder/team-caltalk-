@@ -14,13 +14,14 @@ interface ChatMessageRow {
   chat_id: string;
   sender_user_id: string;
   content: string;
-  created_at: Date;
-  // created_at을 텍스트로도 함께 조회한다. node-postgres는 timestamptz를 JS Date로
-  // 파싱하며 이 과정에서 마이크로초 이하 정밀도가 밀리초로 잘린다 — nextCursor를
-  // Date.toISOString()으로 만들면 그 잘린 값이 원본 행의 실제 created_at보다 미세하게
-  // 작아져, 다음 페이지 조회 시 "created_at > cursor" 조건에 그 행 자신이 다시
-  // 걸려 중복 반환되는 문제가 있었다(실측으로 발견). cursor_value(텍스트, 원본 정밀도
-  // 그대로)를 커서로 사용해 이 문제를 없앤다.
+  // node-postgres는 timestamptz를 JS Date로 파싱하며 이 과정에서 마이크로초 이하
+  // 정밀도가 밀리초로 잘린다. 이 잘린 값을 nextCursor나 ChatMessage.createdAt으로
+  // 돌려주면, 그 값을 다음 폴링/페이지 요청의 cursor로 재사용할 때 원본 행의 실제
+  // created_at(마이크로초 정밀도)이 잘린 커서보다 미세하게 커서 "created_at > cursor"
+  // 조건에 그 행 자신이 다시 걸려 무한 반복 재수신되는 문제가 있었다(실측으로 발견,
+  // 실시간 폴링에서는 매 응답마다 클라이언트가 즉시 재요청하므로 폭주로 이어진다).
+  // to_char로 마이크로초까지 보존한 ISO 8601 문자열(cursor_value)을 커서와
+  // createdAt 양쪽에 공통으로 사용해 이 문제를 없앤다.
   cursor_value: string;
 }
 
@@ -34,9 +35,11 @@ function toChatMessage(row: ChatMessageRow): ChatMessage {
     chatId: row.chat_id,
     senderUserId: row.sender_user_id,
     content: row.content,
-    createdAt: row.created_at.toISOString(),
+    createdAt: row.cursor_value,
   };
 }
+
+const CURSOR_VALUE_SQL = `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
 
 export class PostgresChatRepository implements ChatRepository {
   constructor(private readonly pool: Pool) {}
@@ -54,7 +57,7 @@ export class PostgresChatRepository implements ChatRepository {
     const result = await this.pool.query<ChatMessageRow>(
       `INSERT INTO chat_messages (chat_id, sender_user_id, content)
        VALUES ($1, $2, $3)
-       RETURNING id, chat_id, sender_user_id, content, created_at, created_at::text AS cursor_value`,
+       RETURNING id, chat_id, sender_user_id, content, ${CURSOR_VALUE_SQL} AS cursor_value`,
       [chatId, senderUserId, content],
     );
     return toChatMessage(result.rows[0]);
@@ -71,7 +74,7 @@ export class PostgresChatRepository implements ChatRepository {
     // 캐스팅해 비교한다(위 ChatMessageRow.cursor_value 주석 참조).
     const result = cursor
       ? await this.pool.query<ChatMessageRow>(
-          `SELECT id, chat_id, sender_user_id, content, created_at, created_at::text AS cursor_value
+          `SELECT id, chat_id, sender_user_id, content, ${CURSOR_VALUE_SQL} AS cursor_value
            FROM chat_messages
            WHERE chat_id = $1 AND created_at > $2::timestamptz
            ORDER BY created_at ASC
@@ -79,7 +82,7 @@ export class PostgresChatRepository implements ChatRepository {
           [chatId, cursor, limit + 1],
         )
       : await this.pool.query<ChatMessageRow>(
-          `SELECT id, chat_id, sender_user_id, content, created_at, created_at::text AS cursor_value
+          `SELECT id, chat_id, sender_user_id, content, ${CURSOR_VALUE_SQL} AS cursor_value
            FROM chat_messages
            WHERE chat_id = $1
            ORDER BY created_at ASC

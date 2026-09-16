@@ -5,6 +5,7 @@ import { delegateLeader } from '../api/team.api';
 import type { CurrentTeam } from '../hooks/use-current-team';
 import { useTeamMembers } from '../hooks/use-team-members';
 import { InviteMemberForm } from './InviteMemberForm';
+import { TeamIdCopyButton } from './TeamIdCopyButton';
 import { PendingJoinRequestsPanel } from './PendingJoinRequestsPanel';
 import { MemberList } from './MemberList';
 import { LeaveTeamButton } from './LeaveTeamButton';
@@ -62,6 +63,7 @@ export function TeamDashboard({ team, onTeamCleared }: TeamDashboardProps) {
 
       {isLeader && (
         <>
+          <TeamIdCopyButton teamId={team.id} />
           <InviteMemberForm teamId={team.id} />
           <PendingJoinRequestsPanel teamId={team.id} onApproved={refresh} />
         </>

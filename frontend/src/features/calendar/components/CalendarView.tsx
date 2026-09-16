@@ -8,6 +8,7 @@ import { useCalendarNavigation } from '../hooks/use-calendar-navigation';
 import { useTeamSchedules } from '../hooks/use-team-schedules';
 import { getMonthGridDays, getWeekDays } from '../utils/calendar-date.util';
 import { groupSchedulesByDay } from '../utils/schedule-period.util';
+import { deleteSchedule } from '../api/schedule.api';
 import { ScheduleChatPanel } from '../../chat/components/ScheduleChatPanel';
 import { AgendaListView } from './AgendaListView';
 import { CalendarToolbar } from './CalendarToolbar';
@@ -58,6 +59,24 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
   const handleEditClick = (schedule: Schedule): void => {
     setFormMode('edit');
     setEditingSchedule(schedule);
+  };
+
+  // 캘린더 칩의 (삭제) 아이콘 전용. 상세+채팅 패널이나 수정 폼을 거치지 않고
+  // 바로 삭제한다(요청: 채팅 없이 캘린더에서 바로 수정/삭제하고 싶다).
+  const handleChipDeleteClick = async (schedule: Schedule): Promise<void> => {
+    if (!team || !window.confirm(`"${schedule.title}" 일정을 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      await deleteSchedule(team.id, schedule.id);
+      if (selectedScheduleId === schedule.id) {
+        setSelectedScheduleId(null);
+      }
+      void refresh();
+    } catch {
+      window.alert('삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    }
   };
 
   const handleCreateClick = (): void => {
@@ -157,9 +176,17 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
             schedulesByDay={schedulesByDay}
             anchorMonth={anchorDate.getMonth()}
             onScheduleClick={handleScheduleClick}
+            onScheduleEditClick={isLeader ? handleEditClick : undefined}
+            onScheduleDeleteClick={isLeader ? handleChipDeleteClick : undefined}
           />
         ) : (
-          <AgendaListView days={days} schedulesByDay={schedulesByDay} onScheduleClick={handleScheduleClick} />
+          <AgendaListView
+            days={days}
+            schedulesByDay={schedulesByDay}
+            onScheduleClick={handleScheduleClick}
+            onScheduleEditClick={isLeader ? handleEditClick : undefined}
+            onScheduleDeleteClick={isLeader ? handleChipDeleteClick : undefined}
+          />
         )}
       </div>
       {selectedSchedule && (
@@ -173,7 +200,7 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
         />
       )}
       {formMode && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
             <ScheduleForm
               teamId={team.id}

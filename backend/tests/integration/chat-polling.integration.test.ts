@@ -3,7 +3,11 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { testPool } from './support/db';
 import { createApp } from '../../src/app';
-import { registerAndLogin, createTeamWithMembers, type AuthedUser } from './support/scenario-helpers';
+import {
+  registerAndLogin,
+  createTeamWithMembers,
+  type AuthedUser,
+} from './support/scenario-helpers';
 
 // UC5(실시간 채팅)를 과거 WebSocket(chat.gateway.ts, 제거됨) 대신 REST 롱폴링/전송
 // 엔드포인트로 재구현했음을 실제 HTTP 앱 + 실제 DB로 검증한다(chat-gateway.integration.test.ts
@@ -90,16 +94,14 @@ describe('채팅 롱폴링/전송 (통합)', () => {
       .set('Authorization', `Bearer ${member.token}`);
 
     expect(poll.status).toBe(200);
-    expect(poll.body.data.map((m: { content: string }) => m.content)).toContain('이미 존재하는 메시지');
+    expect(poll.body.data.map((m: { content: string }) => m.content)).toContain(
+      '이미 존재하는 메시지',
+    );
     expect(poll.body.data.map((m: { id: string }) => m.id)).toContain(sent.body.id);
   });
 
   it('새 메시지가 없으면 timeout까지 대기한 뒤 빈 결과를 반환한다', async () => {
-    // 방금 보낸 메시지 자신의 createdAt(밀리초 절삭값)을 커서로 쓰면 실제 DB 값
-    // (마이크로초 정밀도)과의 절삭 오차로 그 메시지 자신이 다시 잡힐 수 있다
-    // (DB-6에 문서화된 정밀도 한계, chat.repository.impl.ts 주석 참조). 이 테스트는
-    // "새 메시지 없음"만 순수하게 검증하려는 것이므로, 확실히 미래인 커서를 써서
-    // 그 재현 가능성 자체를 배제한다.
+    // "새 메시지 없음"만 순수하게 검증하려는 것이므로, 확실히 미래인 커서를 쓴다.
     const futureCursor = new Date(Date.now() + 60_000).toISOString();
 
     const started = Date.now();
@@ -114,7 +116,7 @@ describe('채팅 롱폴링/전송 (통합)', () => {
     expect(elapsedMs).toBeGreaterThanOrEqual(250);
   }, 10000);
 
-  it('폴링 중에 새 메시지가 도착하면 대기하다 그 메시지를 잡아 반환한다', async () => {
+  it('폴링 중에 새 메시지가 도착하면 대기하다 그 메시지를 잡아 반환하고, 커서 기준점 메시지는 다시 포함하지 않는다', async () => {
     const cursorResponse = await request(app)
       .post(`/schedules/${scheduleId}/messages`)
       .set('Authorization', `Bearer ${member.token}`)
@@ -132,8 +134,29 @@ describe('채팅 롱폴링/전송 (통합)', () => {
       .send({ content: '폴링 중 도착한 메시지' });
 
     const poll = await pollPromise;
+    const contents = poll.body.data.map((m: { content: string }) => m.content);
 
     expect(poll.status).toBe(200);
-    expect(poll.body.data.map((m: { content: string }) => m.content)).toContain('폴링 중 도착한 메시지');
+    expect(contents).toContain('폴링 중 도착한 메시지');
+    // 커서로 사용한 자기 자신의 createdAt은 다시 반환되면 안 된다 — 마이크로초
+    // 정밀도가 잘린 커서를 쓰면 "created_at > cursor" 비교에서 자기 자신이 다시
+    // 걸려 무한 재수신 폭주로 이어졌던 회귀(chat.repository.impl.ts의 cursor_value
+    // 참조)를 잡아내는 검증이다.
+    expect(contents).not.toContain('폴링 시작 기준점');
+  }, 10000);
+
+  it('메시지를 보낸 직후 그 응답의 createdAt을 커서로 폴링하면 자기 자신을 다시 받지 않는다', async () => {
+    const sent = await request(app)
+      .post(`/schedules/${scheduleId}/messages`)
+      .set('Authorization', `Bearer ${leader.token}`)
+      .send({ content: '자기 자신 재수신 방지 확인' });
+
+    const poll = await request(app)
+      .get(`/schedules/${scheduleId}/messages/poll`)
+      .query({ cursor: sent.body.createdAt, timeout: 300 })
+      .set('Authorization', `Bearer ${member.token}`);
+
+    expect(poll.status).toBe(200);
+    expect(poll.body.data).toEqual([]);
   }, 10000);
 });

@@ -25,6 +25,10 @@ vi.mock('./InviteMemberForm', () => ({
   InviteMemberForm: ({ teamId }: { teamId: string }) => <div data-testid="invite-form">invite:{teamId}</div>,
 }));
 
+vi.mock('./TeamIdCopyButton', () => ({
+  TeamIdCopyButton: ({ teamId }: { teamId: string }) => <div data-testid="team-id-copy">copy:{teamId}</div>,
+}));
+
 vi.mock('./PendingJoinRequestsPanel', () => ({
   PendingJoinRequestsPanel: () => <div data-testid="pending-panel">pending</div>,
 }));
@@ -77,6 +81,7 @@ describe('TeamDashboard', () => {
     render(<TeamDashboard team={{ id: 't1', name: '프론트팀' }} onTeamCleared={vi.fn()} />);
 
     expect(screen.getByTestId('invite-form')).toBeInTheDocument();
+    expect(screen.getByTestId('team-id-copy')).toBeInTheDocument();
     expect(screen.getByTestId('pending-panel')).toBeInTheDocument();
     expect(screen.getByTestId('member-list')).toBeInTheDocument();
     expect(screen.getByTestId('leave-button')).toBeInTheDocument();
@@ -94,6 +99,7 @@ describe('TeamDashboard', () => {
     render(<TeamDashboard team={{ id: 't1', name: '프론트팀' }} onTeamCleared={vi.fn()} />);
 
     expect(screen.queryByTestId('invite-form')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('team-id-copy')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pending-panel')).not.toBeInTheDocument();
     expect(screen.getByTestId('member-list')).toBeInTheDocument();
   });

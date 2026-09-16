@@ -57,3 +57,10 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.temp
+
+# 로컬 개발용 스크래치/도구 설정 (개인 워크플로우 캐시, 저장소 공용 자산 아님)
+.scratch_issues/
+.mcp.*.json
+!.mcp.json
+.claude/Commands/
+test/e2e/

@@ -32,4 +32,35 @@ describe('ScheduleChip', () => {
 
     expect(onClick).toHaveBeenCalledWith(schedule);
   });
+
+  it('onEditClick/onDeleteClick을 전달하지 않으면 수정/삭제 아이콘을 렌더링하지 않는다', () => {
+    render(<ScheduleChip schedule={schedule} onClick={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: /수정/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /삭제/ })).not.toBeInTheDocument();
+  });
+
+  it('수정 아이콘 클릭 시 onEditClick만 호출하고 onClick(상세 진입)은 호출하지 않는다 (채팅 패널 없이 바로 수정)', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const onEditClick = vi.fn();
+    render(<ScheduleChip schedule={schedule} onClick={onClick} onEditClick={onEditClick} />);
+
+    await user.click(screen.getByRole('button', { name: /수정/ }));
+
+    expect(onEditClick).toHaveBeenCalledWith(schedule);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('삭제 아이콘 클릭 시 onDeleteClick만 호출하고 onClick(상세 진입)은 호출하지 않는다 (채팅 패널 없이 바로 삭제)', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const onDeleteClick = vi.fn();
+    render(<ScheduleChip schedule={schedule} onClick={onClick} onDeleteClick={onDeleteClick} />);
+
+    await user.click(screen.getByRole('button', { name: /삭제/ }));
+
+    expect(onDeleteClick).toHaveBeenCalledWith(schedule);
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });

@@ -9,9 +9,18 @@ export interface MonthGridProps {
   schedulesByDay: Map<string, Schedule[]>;
   anchorMonth: number;
   onScheduleClick(schedule: Schedule): void;
+  onScheduleEditClick?(schedule: Schedule): void;
+  onScheduleDeleteClick?(schedule: Schedule): void;
 }
 
-export function MonthGrid({ days, schedulesByDay, anchorMonth, onScheduleClick }: MonthGridProps) {
+export function MonthGrid({
+  days,
+  schedulesByDay,
+  anchorMonth,
+  onScheduleClick,
+  onScheduleEditClick,
+  onScheduleDeleteClick,
+}: MonthGridProps) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white">
       <div className="grid grid-cols-7 border-b border-gray-200">
@@ -38,7 +47,13 @@ export function MonthGrid({ days, schedulesByDay, anchorMonth, onScheduleClick }
               </div>
               <div className="mt-1 flex flex-col gap-1">
                 {daySchedules.map((schedule) => (
-                  <ScheduleChip key={schedule.id} schedule={schedule} onClick={onScheduleClick} />
+                  <ScheduleChip
+                    key={schedule.id}
+                    schedule={schedule}
+                    onClick={onScheduleClick}
+                    onEditClick={onScheduleEditClick}
+                    onDeleteClick={onScheduleDeleteClick}
+                  />
                 ))}
               </div>
             </div>

@@ -51,7 +51,7 @@ psql -d <database> -f database/schema.sql
 
 - **백엔드** (Node.js + TypeScript + Express): 엄격한 4계층 아키텍처 — `presentation`(HTTP 라우트 + WebSocket 게이트웨이) → `application`(유스케이스 오케스트레이션) → `domain`(엔티티, 규칙, 리포지토리 인터페이스) → `infrastructure`(Postgres 리포지토리 구현체, WebSocket 전송). 의존성은 항상 안쪽(도메인 방향)으로만 향한다. `domain`은 `infrastructure`나 `presentation`을 import해서는 안 된다.
 - **권한 검사는 중앙화**: 모든 인가 로직은 단 하나의 `domain/permission/permission.policy.ts`에만 존재한다 — 다른 계층이 역할 검사를 재구현해서는 안 된다.
-- **채팅은 REST/WebSocket으로 분리**: `chat.routes.ts`(REST)는 페이지네이션된 이력 조회(UC8, `swagger/swagger.json`의 `GET /schedules/{scheduleId}/messages`)만 담당하고, `chat.gateway.ts`(WebSocket)는 실시간 송수신(UC5)만 담당한다 — 이 둘을 하나의 경로로 합치지 말 것. 실시간 송수신은 swagger.json 범위 밖이다.
+- **채팅은 REST 롱폴링으로 통일**: 과거 `chat.gateway.ts`(WebSocket)로 구현했던 실시간 송수신(UC5)은 Vercel 서버리스 배포와 상시 연결 WebSocket이 맞지 않아 REST로 전환했다 — `chat.routes.ts`가 이력 조회(UC8, `GET /schedules/{scheduleId}/messages`), 실시간 수신용 롱폴링(`GET /schedules/{scheduleId}/messages/poll`), 실시간 송신(`POST /schedules/{scheduleId}/messages`)을 모두 담당한다. 셋 다 `swagger/swagger.json` 범위 안이며, `chat.gateway.ts`/`ws-broadcaster.ts`/`ws-auth.guard.ts`는 삭제되었다(더 이상 재도입하지 말 것).
 - **프론트엔드** (Vite 기반 React 18 + TypeScript SPA — `6-tech-stack.md`의 후속 결정에 따라 의도적으로 Next.js 미사용): `src/features/{auth,team,calendar,chat}` 아래 기능 기반 구조, 여러 기능이 공유하는 컴포넌트/훅/타입/API 클라이언트는 `src/shared/`에 배치.
 
 ## 구현을 제약하는 도메인 불변조건
