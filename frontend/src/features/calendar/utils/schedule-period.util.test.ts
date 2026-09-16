@@ -20,7 +20,11 @@ describe('groupSchedulesByDay', () => {
   it('전달된 days 각각을 key로 갖는 Map을 생성하고 startAt 기준으로 일정을 버킷팅한다', () => {
     const days = [new Date(2026, 3, 15), new Date(2026, 3, 16)];
     const scheduleOn15 = buildSchedule({ id: 's1', startAt: new Date(2026, 3, 15, 9).toISOString() });
-    const scheduleOn16 = buildSchedule({ id: 's2', startAt: new Date(2026, 3, 16, 9).toISOString() });
+    const scheduleOn16 = buildSchedule({
+      id: 's2',
+      startAt: new Date(2026, 3, 16, 9).toISOString(),
+      endAt: new Date(2026, 3, 16, 10).toISOString(),
+    });
 
     const result = groupSchedulesByDay([scheduleOn15, scheduleOn16], days);
 
@@ -53,5 +57,31 @@ describe('groupSchedulesByDay', () => {
     const result = groupSchedulesByDay([deleted], days);
 
     expect(result.get('2026-04-15')).toEqual([]);
+  });
+
+  it('여러 날에 걸친 일정은 시작일부터 종료일까지 매일 버킷에 포함된다', () => {
+    const days = [
+      new Date(2026, 8, 20),
+      new Date(2026, 8, 21),
+      new Date(2026, 8, 22),
+      new Date(2026, 8, 23),
+      new Date(2026, 8, 24),
+      new Date(2026, 8, 25),
+    ];
+    const trip = buildSchedule({
+      id: 's1',
+      title: '해외 출장',
+      startAt: new Date(2026, 8, 21, 9).toISOString(),
+      endAt: new Date(2026, 8, 24, 18).toISOString(),
+    });
+
+    const result = groupSchedulesByDay([trip], days);
+
+    expect(result.get('2026-09-20')).toEqual([]);
+    expect(result.get('2026-09-21')).toEqual([trip]);
+    expect(result.get('2026-09-22')).toEqual([trip]);
+    expect(result.get('2026-09-23')).toEqual([trip]);
+    expect(result.get('2026-09-24')).toEqual([trip]);
+    expect(result.get('2026-09-25')).toEqual([]);
   });
 });
