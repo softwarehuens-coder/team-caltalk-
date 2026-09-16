@@ -68,6 +68,36 @@ describe('MonthGrid', () => {
     expect(onScheduleClick).toHaveBeenCalledWith(schedule);
   });
 
+  it('onScheduleEditClick/onScheduleDeleteClick을 ScheduleChip에 전달한다 (채팅 패널 없이 바로 수정/삭제)', async () => {
+    const user = userEvent.setup();
+    const days = buildDays();
+    const schedule = buildSchedule('s1', '주간 회의');
+    const schedulesByDay = new Map<string, Schedule[]>();
+    for (const day of days) {
+      schedulesByDay.set(formatDateParam(day), []);
+    }
+    schedulesByDay.set('2026-04-01', [schedule]);
+    const onScheduleEditClick = vi.fn();
+    const onScheduleDeleteClick = vi.fn();
+
+    render(
+      <MonthGrid
+        days={days}
+        schedulesByDay={schedulesByDay}
+        anchorMonth={3}
+        onScheduleClick={vi.fn()}
+        onScheduleEditClick={onScheduleEditClick}
+        onScheduleDeleteClick={onScheduleDeleteClick}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /수정/ }));
+    await user.click(screen.getByRole('button', { name: /삭제/ }));
+
+    expect(onScheduleEditClick).toHaveBeenCalledWith(schedule);
+    expect(onScheduleDeleteClick).toHaveBeenCalledWith(schedule);
+  });
+
   it('오늘 날짜 셀을 강조 표시한다', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 1, 9, 0, 0)); // 2026-04-01

@@ -4,9 +4,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.1 |
+| 버전 | v1.2 |
 | 작성일 | 2026-09-09 |
-| 최종수정일 | 2026-09-14 |
+| 최종수정일 | 2026-09-16 |
 | 작성자 | Team CalTalk 실행계획 수립 |
 | 근거 문서 | [1-domain-definition.md](./1-domain-definition.md) (v1.4)<br>[2-PRD.md](./2-PRD.md) (v1.0)<br>[3-User-scenarios.md](./3-User-scenarios.md)<br>[4-project-structure.md](./4-project-structure.md) (v1.1)<br>[5-arch-diagram.md](./5-arch-diagram.md)<br>[6-tech-stack.md](./6-tech-stack.md) (v1.0)<br>[database/schema.sql](../database/schema.sql) — 데이터 모델의 실질적 근거(구 7-erd.md 대체)<br>[swagger/swagger.json](../swagger/swagger.json) — API 계약의 실질적 근거(v1.1부터 다시 존재 및 유지 중) |
 
@@ -16,6 +16,7 @@
 |---|---|---|
 | v1.0 | 2026-09-09 | 최초 작성 |
 | v1.1 | 2026-09-14 | DB-1~DB-6·BE-1~BE-10·FE-0~FE-9 전체 구현 및 테스트 완료를 반영해 완료 조건 체크박스를 전부 [x]로 갱신. `swagger/swagger.json`이 재도입되어 실제 API 계약으로 유지되고 있음을 반영(0장 "이전 실행계획과의 차이"/"추가 안내" 문단 갱신). 실사용 중 발견되어 BE-4/BE-7에 추가된 엔드포인트(`GET /teams/{teamId}`, `GET /teams/{teamId}/join-requests`, `GET /schedules/{scheduleId}/change-requests`) 반영 및 "7. 구현 후 발견된 갭" 절 신설(2026-09-14 브라우저 E2E 검증 결과, `.scratch_issues/dev-log.md` 근거) |
+| v1.2 | 2026-09-16 | 2026-09-16 브라우저 수동 테스트(성능 테스트 포함)에서 추가로 발견된 갭 4건을 "8. 2026-09-16 발견된 추가 갭" 절로 신설: (1) 팀 ID를 팀장이 팀원에게 전달할 UI 부재 → `TeamIdCopyButton.tsx` 추가, (2) `GET /teams/{teamId}` 보완 이후에도 가입 승인 후 팀원 화면이 자동 전환되지 않던 잔여 갭 → `JoinTeamForm.tsx` 자동 승인 감지 폴링 + 캘린더 자동 이동, (3) 채팅 롱폴링에서 `createdAt` 밀리초 절삭으로 인한 무한 재수신 폭주(BE-8 완료조건이 전제한 "정상 동작"이 실제로는 폭주였음) → `chat.repository.impl.ts`가 커서/표시값 모두 마이크로초 정밀도로 통일, (4) 일정 수정 폼이 채팅 패널에 z-index로 가려지던 버그 및 캘린더에서 채팅 없이 직접 수정/삭제할 수단 부재 → z-index 수정 + `ScheduleChip.tsx` 수정/삭제 아이콘 추가(`docs/8-wireframes.md` 2.2/2.7 동기화) |
 
 ## 0. 개요
 
@@ -307,7 +308,9 @@ graph TD
 
 ### BE-8. 채팅 웹소켓 게이트웨이 (UC5)
 
-**완료 조건**
+> **[후속 변경, 2026-09-14] WebSocket → REST 롱폴링으로 대체됨.** 배포 대상을 Vercel 서버리스 함수로 정하면서, 아래 완료 조건이 전제한 상시 연결 WebSocket을 유지할 수 없다는 제약이 드러났다(서버리스 함수는 요청 단위로 짧게 실행·종료되는 모델). `chat.gateway.ts`/`ws-broadcaster.ts`/`ws-auth.guard.ts`는 삭제되었고, 동일한 역할(UC5 실시간 송수신)을 `chat.routes.ts`의 `POST /schedules/{scheduleId}/messages`(송신)와 `GET /schedules/{scheduleId}/messages/poll`(롱폴링 수신, `poll-chat-messages.usecase.ts`)가 대신한다. 아래 완료 조건은 **당시 WebSocket 구현 기준으로는 달성되었던 기록**으로 남겨두되, 현재 코드베이스와는 더 이상 일치하지 않는다 — 최신 상태는 `docs/4-project-structure.md` v1.2(5.2/5.4/6.2절)와 `CLAUDE.md`를 참조. 새 구현의 대응 완료 조건: 팀 비소속 시 송신/폴링 모두 403(`chat-polling.integration.test.ts`), `send-chat-message.usecase.ts`/`poll-chat-messages.usecase.ts`가 `list-chat-history.usecase.ts`(BE-6)와 동일한 `canAccessTeamChat` 재사용, REST로 전송된 메시지가 이후 이력 조회로 동일하게 조회됨(저장소 일치, 기존 BE-6과 동일 `ChatRepository` 공유).
+
+**완료 조건 (당시 WebSocket 구현 기준, 위 안내 참조)**
 - [x] `ws-auth.guard.ts`가 핸드셰이크 시점에 토큰 검증, 이후 메시지 단위로도 세션 유효성 재확인
 - [x] 미인증 소켓은 메시지 송수신 불가
 - [x] `chat.gateway.ts`는 페이지네이션 이력 조회를 포함하지 않고 실시간 송수신만 담당(BE-6과 분리)
@@ -456,7 +459,9 @@ graph TD
 
 ### FE-5. 일정별 채팅 패널 + WebSocket 실시간 연동 — UC5
 
-**완료 조건**
+> **[후속 변경, 2026-09-14] WebSocket → REST 롱폴링으로 대체됨** (BE-8 안내 참조). `use-chat-socket.ts`는 삭제되고 `use-chat-polling.ts`가 대신한다. 아래 완료 조건은 당시 WebSocket 구현 기준 기록이며, "WS 연결"은 "롱폴링 요청"으로, "재연결"은 폴링 실패 후 지수 백오프 재시도로 대응한다고 읽으면 현재 구현과 대응된다.
+
+**완료 조건 (당시 WebSocket 구현 기준, 위 안내 참조)**
 - [x] `ScheduleChatPanel.tsx`가 일정 상세와 함께 표시, 메시지 입력/전송 UI 제공
 - [x] `use-chat-socket.ts`가 WS 연결 시 인증 토큰 전달, 인증 실패 시 연결 거부를 UI에 반영
 - [x] 한 사용자의 메시지가 같은 일정 채팅을 보는 다른 사용자에게 실시간 표시(US-03)
@@ -466,7 +471,7 @@ graph TD
 **의존성**
 - [x] FE-3
 - [x] FE-1 (인증 토큰)
-- [x] 백엔드 WebSocket 채팅 게이트웨이(BE-8)
+- [x] 백엔드 채팅 실시간 송수신(BE-8, 현재는 REST 롱폴링/전송)
 
 **예상 규모**: L
 
@@ -552,7 +557,7 @@ graph TD
 | 백엔드 → 프론트 | BE-2 (인증 API) | FE-1 |
 | 백엔드 → 프론트 | BE-4 (팀 API) | FE-2 |
 | 백엔드 → 프론트 | BE-5 (일정 API) | FE-3, FE-4 |
-| 백엔드 → 프론트 | BE-8 (WebSocket) | FE-5 |
+| 백엔드 → 프론트 | BE-8 (실시간 채팅, 현재는 REST 롱폴링/전송) | FE-5 |
 | 백엔드 → 프론트 | BE-6 (채팅 이력 API) | FE-6 |
 | 백엔드 → 프론트 | BE-7 (변경요청 API) | FE-7, FE-8 |
 | 백엔드 → 프론트 | BE-10 (충돌 감지 API) | FE-9 |
@@ -576,3 +581,16 @@ BE-1~BE-10, FE-0~FE-9 구현이 모두 끝난 뒤, 유닛 테스트(백엔드 10
 - **FE-9 — 충돌 경고 후 재저장 시 일정 중복 생성**: 본 문서(FE-9)에는 명시되지 않았던 구현 세부사항으로, 충돌 경고가 뜬 뒤에도 폼이 `create` 모드로 남아있어 사용자가 "저장"을 다시 누르면 동일 일정이 중복 생성되는 버그가 있었다. 저장 성공 시점에 폼을 `edit` 모드로 전환하도록 수정했다.
 
 **시사점**: 위 두 건(BE-4/BE-7 관련)은 각 백엔드 태스크의 완료 조건이 "요청측 API"만 정의하고 "그 결과를 다른 역할(특히 팀장)이 어떻게 조회하는가"를 명시하지 않아서 발생했다. 향후 태스크를 쪼갤 때는 **쓰기 API뿐 아니라, 그 쓰기 결과를 다른 액터가 조회하는 경로까지 완료 조건에 함께 명시**하는 것을 권장한다.
+
+---
+
+## 8. 2026-09-16 발견된 추가 갭
+
+7장의 두 갭을 수정한 뒤에도 시간이 지나 팀장/팀원 두 계정으로 다시 브라우저 성능/기능 테스트를 진행하는 과정에서 추가로 4건의 갭이 발견되어 즉시 수정했다.
+
+- **FE-2 — 팀장이 팀 ID를 팀원에게 전달할 UI 자체가 없었음**: `POST /teams`(BE-4) 응답에는 `id`가 포함되지만, `CreateTeamForm.tsx`/`TeamDashboard.tsx`는 그동안 팀 이름만 화면에 표시했다. 팀원이 가입하려면 팀 ID가 필요한데(FE-2 완료조건의 `JoinTeamForm.tsx`), 팀장이 그 값을 확인할 방법이 브라우저 개발자도구로 API 응답을 직접 열어보는 것뿐이었다. `TeamIdCopyButton.tsx`를 신설해 `TeamDashboard.tsx`의 팀장 전용 영역(초대 폼 위)에 팀 ID와 클립보드 복사 버튼을 노출하도록 보완했다(`docs/8-wireframes.md` 2.7절 동기화).
+- **FE-2 — `GET /teams/{teamId}` 보완 이후에도 남아있던 "가입 승인 후 자동 진입 불가" 잔여 갭**: 7장에서 `GET /teams/{teamId}`를 추가해 "팀 ID를 재입력하면 진입 가능"까지는 해결했지만, 그 재입력 자체를 팀원이 언제 해야 하는지 알려주는 수단이 없었다 — 팀장이 승인해도 팀원 화면은 "대기 중" 문구에 그대로 머물러, 실사용자는 승인 여부를 알 방법이 없었다(정확히는 이미 해결된 줄 알았던 갭이 새로고침을 유도하는 수단의 부재로 재발한 것). `JoinTeamForm.tsx`가 PENDING 상태 동안 3초 간격으로 `POST /teams/{teamId}/join`을 재호출해 승인(`ALREADY_MEMBER` 409) 여부를 자동 감지하고, 감지 즉시 `TeamPage.tsx`가 캘린더(`/`)로 자동 이동하도록 보완했다.
+- **BE-8(현 REST 롱폴링)/FE-5 — 실시간 채팅 롱폴링 무한 재수신 폭주**: `chat.repository.impl.ts`의 `toChatMessage()`가 `ChatMessage.createdAt`을 `created_at.toISOString()`(밀리초 절삭)으로 만들었는데, DB 원본은 마이크로초 정밀도다. `use-chat-polling.ts`는 이 값을 그대로 다음 폴링의 `cursor`로 재사용하므로, `WHERE created_at > cursor` 비교에서 방금 받은 메시지 자신이 절삭 오차만큼 항상 다시 걸려 **응답을 받는 즉시 재요청하는 폴링 루프가 지연 없이 초당 100회 이상 반복**되는 것이 브라우저 네트워크 탭에서 실측되었다(UI에는 `mergeById` 중복 제거 덕분에 드러나지 않아 유닛 테스트로는 발견되지 않았다). 이미 페이지네이션 `nextCursor`에서는 같은 문제를 `cursor_value`(마이크로초 정밀도 텍스트)로 해결해 두었으나, 실시간 폴링이 쓰는 `createdAt` 필드에는 그 수정이 반영되지 않아 같은 근본 원인이 다른 경로로 재발한 사례다. `toChatMessage()`가 `createdAt`에도 `cursor_value`(마이크로초까지 보존하는 `to_char(... 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`)를 쓰도록 통일해 해결했다. 회귀 테스트를 `chat-polling.integration.test.ts`에 추가했다(자기 자신의 `createdAt`을 커서로 폴링해도 재수신되지 않음을 확인).
+- **FE-4 — 일정 수정 폼이 채팅 패널에 가려짐 + 캘린더에서 채팅 없이 직접 수정/삭제 불가**: `CalendarView.tsx`에서 채팅 패널(`ScheduleChatPanel`, `z-40`)을 연 상태로 "수정" 버튼을 누르면 `ScheduleForm` 모달이 열리기는 했으나 z-index가 지정되지 않아(`z-auto`) 채팅 패널 뒤에 가려져 화면상 아무 반응이 없는 것처럼 보였다. 모달에 `z-50`을 지정해 해결했다. 더불어 `docs/8-wireframes.md` 2.2절이 애초에 "수정/삭제 진입 UI 없음(채팅 패널 경유만 가능)"으로 설계했던 부분을, 실사용 피드백에 따라 캘린더 칩에 팀장 전용 (연필)/(X) 아이콘을 추가해 채팅 패널을 거치지 않고 바로 수정/삭제할 수 있도록 설계를 변경했다(`ScheduleChip.tsx`, `docs/8-wireframes.md` 2.2절 동기화 — 칩 본문 클릭은 기존과 동일하게 상세+채팅 패널로 이동).
+
+**시사점**: 이번 4건 중 절반(팀 ID 공유, 승인 후 자동 진입)은 "쓰기 API는 있지만 그 결과를 상대방이 알아채는 경로가 없다"는 7장과 동일한 패턴의 재발이다. 단일 팀 컨텍스트(팀 목록 조회 API 없음) 설계를 유지하는 한, 팀 관련 상태 변화(가입 승인 등)를 프론트가 어떻게 감지할지는 매 기능마다 개별적으로 챙겨야 하는 상시 리스크로 남는다. 나머지 2건(채팅 폭주, z-index)은 유닛 테스트가 값의 "형식"(문자열 여부 등)만 검증하고 "정밀도"나 "시각적 겹침" 같은 속성은 검증 범위 밖이라 실제 브라우저 조작 없이는 잡히지 않는 종류의 결함이었다 — 이런 갭은 구조적으로 유닛 테스트만으로는 예방할 수 없으므로, MVP 완료 후에도 주요 플로우에 대한 브라우저 E2E 점검을 정기적으로 반복하는 것을 권장한다.

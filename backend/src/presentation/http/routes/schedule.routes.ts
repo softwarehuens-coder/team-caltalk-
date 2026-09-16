@@ -6,6 +6,7 @@ import { createSchedule } from '../../../application/schedule/create-schedule.us
 import { updateSchedule } from '../../../application/schedule/update-schedule.usecase';
 import { deleteSchedule } from '../../../application/schedule/delete-schedule.usecase';
 import { respondToDomainError } from '../error-mapper';
+import { isUuid } from '../validation';
 
 function isValidScheduleBody(
   body: unknown,
@@ -31,6 +32,7 @@ export function createScheduleRouter(
   router.get('/teams/:teamId/schedules', async (req, res) => {
     const { view, date } = req.query;
     if (
+      !isUuid(req.params.teamId) ||
       typeof view !== 'string' ||
       !['month', 'week', 'day'].includes(view) ||
       typeof date !== 'string'
@@ -52,7 +54,7 @@ export function createScheduleRouter(
   });
 
   router.post('/teams/:teamId/schedules', async (req, res) => {
-    if (!isValidScheduleBody(req.body)) {
+    if (!isUuid(req.params.teamId) || !isValidScheduleBody(req.body)) {
       res.status(400).json({ code: 'INVALID_REQUEST', message: '요청 형식이 올바르지 않습니다.' });
       return;
     }
@@ -74,7 +76,7 @@ export function createScheduleRouter(
   });
 
   router.put('/teams/:teamId/schedules/:id', async (req, res) => {
-    if (!isValidScheduleBody(req.body)) {
+    if (!isUuid(req.params.teamId) || !isUuid(req.params.id) || !isValidScheduleBody(req.body)) {
       res.status(400).json({ code: 'INVALID_REQUEST', message: '요청 형식이 올바르지 않습니다.' });
       return;
     }
@@ -97,6 +99,11 @@ export function createScheduleRouter(
   });
 
   router.delete('/teams/:teamId/schedules/:id', async (req, res) => {
+    if (!isUuid(req.params.teamId) || !isUuid(req.params.id)) {
+      res.status(400).json({ code: 'INVALID_REQUEST', message: '요청 형식이 올바르지 않습니다.' });
+      return;
+    }
+
     try {
       await deleteSchedule(teamRepository, scheduleRepository, {
         teamId: req.params.teamId,

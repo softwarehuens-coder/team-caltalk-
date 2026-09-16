@@ -2,9 +2,14 @@
 
 ## 1. 개요
 
-이 문서는 **실제로 구현이 완료된 백엔드**(`backend/`, Node.js + TypeScript + Express, BE-1~BE-9)와
-**아직 존재하지 않는 프론트엔드**(`frontend/`)를 정확히 통합하기 위한 실무 레퍼런스다. 대상 독자는
-프론트엔드(FE-0~FE-9)를 구현하는 사람/에이전트다.
+> **[2026-09-16 갱신]** 이 문서는 원래 프론트엔드(FE-0~FE-9) 구현 착수 시점에 작성된 레퍼런스다.
+> 현재는 `backend/`(Node.js + TypeScript + Express, BE-1~BE-10)와 `frontend/`(Vite + React +
+> TypeScript, FE-0~FE-9) 모두 구현·테스트 완료 상태이며(`docs/7-execution-plan.md` 참조), 이 문서는
+> 이제 "신규 구현 가이드"가 아니라 **두 계층이 실제로 어떻게 맞물려 있는지 확인하는 통합 레퍼런스**로
+> 기능한다. 아래 각 절은 여전히 실제 코드와 합치하도록 유지·갱신하고 있다.
+
+이 문서는 **백엔드**(`backend/`, Node.js + TypeScript + Express)와 **프론트엔드**(`frontend/`, Vite +
+React + TypeScript)를 정확히 통합하기 위한 실무 레퍼런스다.
 
 이 문서는 `backend/src`의 실제 코드를 직접 읽고 작성했다. `swagger/swagger.json`(API 계약 SSOT)과
 코드가 어긋나는 지점을 발견하면 9장에 명시한다 — 발견되지 않았다면 두 문서는 일치하는 것이다.
@@ -36,13 +41,13 @@ npm run dev             # tsx watch src/server.ts
 ### CORS 미들웨어 없음
 
 `backend/src/app.ts`에는 CORS 설정이 전혀 없다(`cors` 패키지가 `package.json` 의존성에도 없음). 프론트엔드
-Vite 개발 서버(기본 5173)에서 백엔드(3001)를 직접 `fetch`/WebSocket 연결하면 브라우저가 CORS 정책으로
-요청을 차단한다.
+Vite 개발 서버(기본 5173)에서 백엔드(3001)를 직접 `fetch` 호출하면 브라우저가 CORS 정책으로 요청을
+차단한다.
 
 **임시 해결책 (프론트엔드 쪽, 이 저장소 범위)**: Vite dev server의 프록시 기능으로 우회한다.
 
 ```ts
-// frontend/vite.config.ts (FE-0에서 작성)
+// frontend/vite.config.ts
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -53,20 +58,18 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/ws': {
-        target: 'ws://localhost:3001',
-        ws: true,
-        rewrite: (path) => path.replace(/^\/ws/, '/ws'),
-      },
     },
   },
 });
 ```
 
 프론트엔드 API 클라이언트는 `http://localhost:3001` 대신 상대 경로(`/api/...`)로 호출하도록 구성한다.
+실시간 채팅(7장)도 v1.2부터 REST 롱폴링이라 별도 프록시 규칙이 필요 없다 — `/api` 프록시 하나로 충분하다.
 
 **근본 해결책 (백엔드 쪽, 이 가이드에서는 수정하지 않음)**: `backend/src/app.ts`에 `cors` 미들웨어 추가가
-필요하다. 이는 별도 백엔드 작업으로 남겨야 한다(이 문서/태스크의 범위 밖).
+필요하다. 특히 **프론트엔드와 백엔드를 별개의 Vercel 프로젝트(서로 다른 도메인)로 배포하는 경우, 이 Vite
+dev proxy 우회책은 프로덕션에서 전혀 적용되지 않으므로 CORS 미들웨어 추가가 필수**가 된다. 이는 별도
+백엔드 작업으로 남겨야 한다(이 문서/태스크의 범위 밖).
 
 ## 4. 인증 흐름 (UC1, FE-1 연결)
 
@@ -104,7 +107,9 @@ export default defineConfig({
 | `/teams/{teamId}/schedules` | POST | 필요(LEADER) | 일정 생성. 응답에 `conflictWarnings`(UC9/SC4) 포함, 경고 있어도 저장은 차단 안 됨 | FE-4 |
 | `/teams/{teamId}/schedules/{id}` | PUT | 필요(LEADER) | 일정 수정 | FE-4 |
 | `/teams/{teamId}/schedules/{id}` | DELETE | 필요(LEADER) | 일정 소프트 삭제(`deleted_at`만 갱신, 204) | FE-4 |
-| `/schedules/{scheduleId}/messages` | GET | 필요 | 채팅 이력 커서 페이지네이션 조회(REST, UC8) — 실시간 송수신은 WebSocket 전용(7장) | FE-6 |
+| `/schedules/{scheduleId}/messages` | GET | 필요 | 채팅 이력 커서 페이지네이션 조회(UC8) | FE-6 |
+| `/schedules/{scheduleId}/messages` | POST | 필요 | 채팅 메시지 전송(UC5 실시간 송신, 7장) | FE-5 |
+| `/schedules/{scheduleId}/messages/poll` | GET | 필요 | 채팅 메시지 롱폴링 수신(UC5 실시간 수신, 7장) | FE-5 |
 | `/schedules/{scheduleId}/change-requests` | POST | 필요(MEMBER, 참여자만) | 변경 요청 제출(`status=PENDING`) | FE-7 |
 | `/change-requests/{id}/approve` | POST | 필요(LEADER) | 변경 요청 승인, `schedules` 갱신과 단일 트랜잭션(SC3) | FE-8 |
 | `/change-requests/{id}/reject` | POST | 필요(LEADER) | 변경 요청 거절(`reason` 필수) | FE-8 |
@@ -122,6 +127,12 @@ export default defineConfig({
 FE-2 구현 시 "가입 신청 → 팀장 승인 대기 화면"과 "팀장용 대기 목록 + 승인 버튼" UI가 모두 필요하며,
 가입 신청 직후 바로 캘린더/채팅에 접근 가능한 것으로 가정하면 안 된다(승인 전에는 `team_memberships`가 없음).
 
+**(2026-09-16 추가) 승인 감지 및 팀 이름 조회**: "내 팀 목록 조회" API가 없어(단일 팀 컨텍스트 설계,
+`docs/7-execution-plan.md` 7장) 승인 이후 프론트가 팀 이름을 얻을 방법이 `GET /teams/{teamId}`(재입력한
+팀 ID로 조회) 뿐이다. `JoinTeamForm.tsx`는 대기 중인 동안 3초 간격으로 1번 엔드포인트를 재호출해
+409(`ALREADY_MEMBER`)로 전환되는 시점을 감지하고, 감지 즉시 `GET /teams/{teamId}`로 이름을 받아와
+자동으로 캘린더 화면으로 이동한다 — 사용자가 팀 ID를 수동으로 다시 입력할 필요가 없다.
+
 ## 6. 공통 에러 응답 형식
 
 모든 에러 응답은 `{ code: string, message: string }` 형태(`backend/src/presentation/http/error-mapper.ts`,
@@ -135,38 +146,46 @@ FE-2 구현 시 "가입 신청 → 팀장 승인 대기 화면"과 "팀장용 �
 | 404 | 리소스 없음 | `NotFoundError`(예: `TEAM_NOT_FOUND`, `SCHEDULE_NOT_FOUND`, `JOIN_REQUEST_NOT_FOUND`) |
 | 409 | 상태 충돌 | `ConflictError`(예: `ALREADY_MEMBER`, `JOIN_REQUEST_NOT_PENDING`, 유일 팀장 탈퇴 시도, 이미 결정된 변경요청) |
 
-## 7. WebSocket 채팅 연동 (UC5, FE-5)
+## 7. 채팅 실시간 송수신 (UC5, FE-5) — REST 롱폴링
 
-- **연결 URL**: `ws://<host>:<port>/ws/chat?token=<JWT>` — 토큰은 **쿼리 파라미터**로 전달한다(헤더 아님).
-  `backend/src/presentation/websocket/chat.gateway.ts`가 `WebSocketServer({ server, path: '/ws/chat' })`로
-  마운트되어 있다.
-- **인증 실패**: 토큰 누락/무효 시 서버가 핸드셰이크 직후 close code **4401**로 연결을 닫는다
-  (`ws-auth.guard.ts`의 `verifySocketToken`).
-- **메시지 단위 재검증**: 연결 이후에도 메시지를 받을 때마다 토큰을 다시 검증한다. 연결 중 토큰이
-  만료되면 그 시점에 소켓이 4401로 닫힌다 — 프론트는 close 이벤트를 감지해 재로그인 또는 토큰 재발급 후
-  재연결을 유도해야 한다.
-- **클라이언트 → 서버 커맨드**:
-  - 구독: `{"type":"join","scheduleId":"<uuid>"}` — 팀 소속 권한(`canAccessTeamChat`)이 없으면 서버가
-    `{"type":"error", code, message}`를 보내고 구독을 거부한다. 소켓당 한 번에 하나의 `scheduleId`만
-    구독되며, 재`join` 시 이전 구독은 자동 해제된다.
-  - 전송: `{"type":"message","scheduleId":"<uuid>","content":"..."}`
-- **서버 → 클라이언트**:
-  - 브로드캐스트: `{"type":"message","message":<ChatMessage>}` — 해당 `scheduleId`를 구독 중인 소켓에게만
-    전송된다.
-  - 에러: `{"type":"error","code":"...","message":"..."}`
-- **REST 이력 조회와의 역할 분리**: 과거 메시지 페이지네이션 조회는 `GET /schedules/{scheduleId}/messages`
-  (REST, UC8, FE-6)만 담당한다. WebSocket 게이트웨이는 실시간 송수신만 처리하며 이력 조회 기능이 없다.
-  FE-5는 화면 진입 시 REST로 초기 이력을 불러온 뒤, WebSocket으로 `join` 커맨드를 보내 실시간 갱신을
-  구독하는 방식으로 구현한다(FE-6 완료조건: "이력 조회 결과와 FE-5 실시간 메시지가 하나의 목록에서
-  시간순 표시").
-- **재연결 권장사항**: 명세된 자동 재연결 로직은 없다(서버가 구현을 강제하지 않음) — 프론트에서 close
-  이벤트 발생 시 지수 백오프 재연결 + 재연결 성공 시 현재 보고 있는 `scheduleId`로 재`join`을 구현해야
-  한다. 4401로 닫힌 경우는 재연결 전에 토큰을 갱신(재로그인)해야 한다.
+> **[v1.2, 2026-09-14] WebSocket에서 전환됨.** 최초 설계는 이 절에서 WebSocket(`ws://.../ws/chat`)을
+> 사용했으나, 백엔드를 Vercel 서버리스 함수로 배포하기로 하면서 상시 연결이 필요한 WebSocket을 유지할 수
+> 없다는 제약이 드러나 REST 롱폴링으로 전환했다. `chat.gateway.ts`/`ws-broadcaster.ts`/`ws-auth.guard.ts`는
+> 삭제되었다. 배경은 `docs/4-project-structure.md` 5.4절 참조.
+
+일반 REST 인증(4장)과 완전히 동일하게 `Authorization: Bearer <token>` 헤더로 인증한다 — 별도의 핸드셰이크나
+쿼리 파라미터 토큰 전달이 없다.
+
+- **전송**: `POST /schedules/{scheduleId}/messages`, 바디 `{"content":"..."}` → 201로 저장된 `ChatMessage`를
+  그대로 반환한다. 팀 비소속(`canAccessTeamChat` 미통과)이면 403, 일정/채팅을 찾을 수 없으면 404.
+  (`send-chat-message.usecase.ts`, `list-chat-history.usecase.ts`와 동일한 권한 판단 재사용.)
+- **수신(롱폴링)**: `GET /schedules/{scheduleId}/messages/poll?cursor=<createdAt>&timeout=<ms>` — `cursor`
+  이후 새 메시지가 생길 때까지 서버가 최대 `timeout`(ms, 기본/상한 25000)만큼 응답을 들고 있다가, 새 메시지가
+  생기면 즉시, 없으면 `timeout` 경과 후 `{ data: [], nextCursor: null, hasMore: false }`로 응답한다
+  (`poll-chat-messages.usecase.ts`). `cursor` 생략 시 채팅의 첫 메시지부터 조회한다.
+- **클라이언트 루프**: 응답을 받는 즉시 반환된 `data`의 마지막 메시지 `createdAt`을 다음 `cursor`로 삼아 곧바로
+  다시 요청한다(무한 반복) — `frontend/src/features/chat/hooks/use-chat-polling.ts`가 이 루프와 실패 시
+  지수 백오프 재시도(초기 1초, 최대 30초)를 구현한다.
+- **초기 연결 시나리오**: 화면 진입 시 REST 이력 조회(`GET /schedules/{scheduleId}/messages`, cursor 없이)로
+  현재까지의 메시지를 먼저 불러오고, 그 마지막 메시지의 `createdAt`을 첫 폴링 요청의 `cursor`로 사용한다.
+  이력이 없으면(`messages.length === 0`) `cursor` 없이 폴링을 시작한다.
+- **인증 만료**: 폴링/전송 요청이 401을 받으면 일반 REST와 동일하게 처리된다(6장) — 프론트는 저장된 토큰을
+  폐기하고 재로그인을 유도하며, 더 이상 재시도하지 않는다.
+- **정밀도 한계(수정됨, 2026-09-16)**: 한때 `cursor`로 쓰는 `createdAt`이 밀리초 정밀도(`Date.toISOString()`)
+  였는데 DB 저장값은 마이크로초 정밀도라, 기준으로 삼은 메시지 자신이 절삭 오차만큼 다음 폴링에 다시
+  걸리는 문제가 있었다(DB-6에 문서화된 것과 같은 종류의 정밀도 한계). 클라이언트가 메시지 `id`로 중복은
+  제거하지만, 문제는 화면 중복이 아니라 **응답을 받는 즉시 재요청하는 폴링 루프가 지연 없이 무한 반복되어
+  서버에 초당 100회 이상 요청이 몰리는 것**이었다(브라우저 실측 확인). `chat.repository.impl.ts`의
+  `toChatMessage()`가 페이지네이션 `nextCursor`와 동일하게 마이크로초 정밀도 `cursor_value`를
+  `createdAt`에도 사용하도록 통일해 해결했다 — 현재는 이 문제가 재발하지 않는다
+  (`docs/7-execution-plan.md` 8장 참조).
+- **REST 이력 조회와의 관계**: 세 엔드포인트(이력 조회/폴링 수신/전송) 모두 동일한 `ChatRepository` 구현체를
+  공유하므로, 전송된 메시지는 즉시 이력 조회로도 동일하게 나타난다(저장소 일치).
 
 ## 8. 필드 네이밍 매핑
 
 - DB(`database/schema.sql`)는 `snake_case`(예: `team_id`, `start_at`, `deleted_at`).
-- REST/WebSocket JSON 바디는 항상 `camelCase`(예: `teamId`, `startAt`, `deletedAt`).
+- REST JSON 바디는 항상 `camelCase`(예: `teamId`, `startAt`, `deletedAt`).
 - 매핑은 백엔드 인프라 계층(`infrastructure/db/postgres/*.repository.impl.ts`)의 책임이며, 프론트는
   camelCase만 다루면 된다(`swagger/swagger.json` `info.description` 규약과 동일).
 

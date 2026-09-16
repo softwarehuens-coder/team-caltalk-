@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Team } from '../../../shared/types/team.types';
 
 const useCurrentTeamMock = vi.fn();
@@ -41,11 +42,22 @@ afterEach(() => {
   useCurrentTeamMock.mockReset();
 });
 
+function renderTeamPage(): void {
+  render(
+    <MemoryRouter initialEntries={['/team']}>
+      <Routes>
+        <Route path="/" element={<div>캘린더 화면</div>} />
+        <Route path="/team" element={<TeamPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe('TeamPage', () => {
   it('team이 없으면 CreateTeamForm과 JoinTeamForm을 렌더링하고 TeamDashboard는 렌더링하지 않는다', () => {
     useCurrentTeamMock.mockReturnValue({ team: null, setTeam: vi.fn(), clearTeam: vi.fn() });
 
-    render(<TeamPage />);
+    renderTeamPage();
 
     expect(screen.getByText('create-team-stub')).toBeInTheDocument();
     expect(screen.getByTestId('join-form')).toBeInTheDocument();
@@ -57,21 +69,25 @@ describe('TeamPage', () => {
     const setTeam = vi.fn();
     useCurrentTeamMock.mockReturnValue({ team: null, setTeam, clearTeam: vi.fn() });
 
-    render(<TeamPage />);
+    renderTeamPage();
     await user.click(screen.getByText('create-team-stub'));
 
     expect(setTeam).toHaveBeenCalledWith(expect.objectContaining({ id: 't1', name: '프론트팀' }));
+    // 팀장은 팀 생성 직후 이 화면에 남아 팀원 초대/승인을 계속 진행해야 하므로
+    // 캘린더로 자동 이동하지 않는다.
+    expect(screen.queryByText('캘린더 화면')).not.toBeInTheDocument();
   });
 
-  it('JoinTeamForm에서 이미 승인된 멤버로 확인되면(onJoined) setTeam이 호출된다 (승인 후 팀 진입 불가 버그 회귀 테스트)', async () => {
+  it('JoinTeamForm에서 가입 승인이 확인되면(onJoined) setTeam을 호출하고 캘린더 화면으로 자동 이동한다 (팀원이 승인 후 캘린더로 못 넘어가던 버그 회귀 테스트)', async () => {
     const user = userEvent.setup();
     const setTeam = vi.fn();
     useCurrentTeamMock.mockReturnValue({ team: null, setTeam, clearTeam: vi.fn() });
 
-    render(<TeamPage />);
+    renderTeamPage();
     await user.click(screen.getByText('join-form-joined-stub'));
 
     expect(setTeam).toHaveBeenCalledWith(expect.objectContaining({ id: 't1', name: '프론트팀' }));
+    expect(await screen.findByText('캘린더 화면')).toBeInTheDocument();
   });
 
   it('team이 있으면 TeamDashboard를 렌더링하고 CreateTeamForm/JoinTeamForm은 렌더링하지 않는다', () => {
@@ -81,7 +97,7 @@ describe('TeamPage', () => {
       clearTeam: vi.fn(),
     });
 
-    render(<TeamPage />);
+    renderTeamPage();
 
     expect(screen.getByText('clear-team-stub')).toBeInTheDocument();
     expect(screen.queryByText('create-team-stub')).not.toBeInTheDocument();
@@ -97,7 +113,7 @@ describe('TeamPage', () => {
       clearTeam,
     });
 
-    render(<TeamPage />);
+    renderTeamPage();
     await user.click(screen.getByText('clear-team-stub'));
 
     expect(clearTeam).toHaveBeenCalledTimes(1);

@@ -6,4 +6,5 @@
 
 ### 적용 원칙
 - SOLID 원칙 적용
-- Clean Architecture 준수
+- Clean Architecture 반드시 적용
+

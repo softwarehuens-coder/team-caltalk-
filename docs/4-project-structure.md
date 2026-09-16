@@ -4,9 +4,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.1 |
+| 버전 | v1.2 |
 | 작성일 | 2026-09-07 |
-| 최종수정일 | 2026-09-07 |
+| 최종수정일 | 2026-09-14 |
 | 작성자 | Team CalTalk 아키텍처 리뷰 |
 | 근거 문서 | [1-domain-definition.md](./1-domain-definition.md) (v1.4) — 도메인 용어, 액터/권한 SSOT, 팀 라이프사이클, UC1-UC9, 성공기준 SC1-SC4<br>[2-PRD.md](./2-PRD.md) (v1.0) — MVP 범위, 기능/비기능 요구사항<br>[3-User-scenarios.md](./3-User-scenarios.md) (v1.0) — 실사용 흐름(US-01~US-08)<br>[6-tech-stack.md](./6-tech-stack.md) (v1.0) — 기술 스택 선정 근거(DB 비교·결정 포함) |
 
@@ -16,10 +16,11 @@
 |---|---|---|
 | v1.0 | 2026-09-07 | 최초 작성 |
 | v1.1 | 2026-09-07 | 6-tech-stack.md의 비교 분석 결과를 반영하여 데이터베이스를 PostgreSQL로 확정 — "작업 가정/미확정" 표현을 확정된 결정으로 갱신 |
+| v1.2 | 2026-09-14 | 실시간 채팅(UC5)을 WebSocket에서 REST 롱폴링으로 전환 — Vercel 서버리스 함수 배포와 상시 연결 WebSocket이 맞지 않아 재검토한 결과. `chat.gateway.ts`/`ws-broadcaster.ts`/`ws-auth.guard.ts`/`use-chat-socket.ts` 삭제, `chat.routes.ts`(REST)가 이력 조회·실시간 수신(폴링)·실시간 송신을 모두 담당하도록 5.2/5.4/6.1/6.2절 갱신 |
 
 **전제 및 확정 사항**
 
-- 본 문서에서 프런트엔드/백엔드 예시에 사용하는 기술 스택은 사용자가 명시적으로 확정한 값이다: **프런트엔드 = React + TypeScript, 백엔드 = Node.js + TypeScript, 실시간 채팅 = WebSocket**.
+- 본 문서에서 프런트엔드/백엔드 예시에 사용하는 기술 스택은 사용자가 명시적으로 확정한 값이다: **프런트엔드 = React + TypeScript, 백엔드 = Node.js + TypeScript, 실시간 채팅 = REST 롱폴링**(v1.2 — 최초 WebSocket 결정을 Vercel 서버리스 배포 호환을 위해 전환. 아래 6.2 각주 참조).
 - 데이터베이스는 **PostgreSQL로 확정**되었다([6-tech-stack.md](./6-tech-stack.md) 4장 — 관계형 구조·참조 무결성, SC3 트랜잭션 일관성, 채팅 대량 누적 대응력, MVP 개발 생산성 기준의 비교 분석 결과). 아래 2.2/1.3의 "특정 DB에 종속되지 않는 경계" 원칙은 이 확정과 무관하게, 도메인 로직을 인프라 세부사항으로부터 보호하기 위한 아키텍처 원칙으로서 계속 유지된다.
 - 본 문서는 **원칙/가이드라인 문서**이다. 데이터베이스 스키마, API 엔드포인트 목록, 컴포넌트 props 정의 등 구체적인 기술 설계 산출물은 다루지 않는다. 그런 산출물은 본 문서의 원칙을 따라 이후 단계에서 작성되어야 한다.
 
@@ -172,8 +173,7 @@ Team CalTalk은 다음 4개 레이어로 구성한다(프런트엔드/백엔드 
 ### 5.2 인증/권한 강제 지점
 
 - UC1(인증)은 우회 불가능한 위치에서 강제되어야 한다. 구체적으로:
-  - HTTP 요청은 라우트 미들웨어 단계에서 인증 여부를 검사하며, 개별 컨트롤러가 각자 인증을 확인하도록 맡기지 않는다.
-  - WebSocket 연결은 최초 연결(핸드셰이크) 시점에 인증을 검사하고, 이후 메시지 단위로도 세션 유효성을 재확인한다. 인증되지 않은 소켓은 채팅 메시지를 주고받을 수 없어야 한다.
+  - HTTP 요청은 라우트 미들웨어 단계에서 인증 여부를 검사하며, 개별 컨트롤러가 각자 인증을 확인하도록 맡기지 않는다. 실시간 채팅(UC5, 롱폴링 수신/전송)도 별도 인증 경로를 두지 않고 이 공통 미들웨어를 그대로 통과한다 — 과거 WebSocket 핸드셰이크/메시지 단위 재검증이 하던 역할을, REST로 전환한 뒤에는 매 폴링/전송 요청 자체가 독립된 인증된 HTTP 요청이라는 점이 자연스럽게 대신한다.
 - 권한(4장 SSOT) 검사는 애플리케이션 계층이 도메인 계층의 판단 로직을 반드시 경유하도록 강제하고, 프레젠테이션 계층이나 인프라 계층에서 권한을 임의로 재판단하지 않는다(2.4 참조). 이는 "권한 검사가 여러 진입점에 흩어지지 않게 한다"는 1.2 원칙의 실행 지점이다.
 
 ### 5.3 로깅/관측성 기본 원칙
@@ -187,8 +187,9 @@ Team CalTalk은 다음 4개 레이어로 구성한다(프런트엔드/백엔드 
 - PRD 8장은 채팅 이력이 SC2에 따라 기간 제한 없이 영구 보존되므로 저장소가 선형으로 증가하는 리스크를 명시하고 있다. 본 문서는 구체적 아카이빙 구현을 다루지 않지만, 설계 원칙 수준에서 다음을 미리 고려한다.
   - 채팅 메시지의 저장/조회 로직을 도메인 인터페이스 뒤에 두어(2.2 참조), 추후 저장 전략(예: 콜드 스토리지 이관)이 바뀌어도 애플리케이션/도메인 계층이 영향받지 않게 한다.
   - 조회 API/쿼리 경로를 설계할 때부터 "무기한 누적 데이터"를 전제로 페이지네이션 등 점진적 조회가 가능한 구조를 기본값으로 삼는다.
-  - 이런 이유로 실시간 송수신(UC5)과 이력 조회(UC8)는 경로를 분리한다: 페이지네이션 기반의 점진적 조회는 REST(HTTP)가 자연스럽고, WebSocket은 저지연 실시간 스트림 전달에 적합하기 때문이다(6.2의 `chat.routes.ts` / `chat.gateway.ts` 분리 참조).
-  - 이는 지금 결정을 내리자는 것이 아니라, 나중에 결정을 바꿀 여지를 구조적으로 남겨두자는 것이다(1.6 원칙과 연결).
+  - (v1.2 갱신) 최초 설계에서는 실시간 송수신(UC5)과 이력 조회(UC8)를 REST/WebSocket으로 경로 분리했으나, 배포 대상을 Vercel 서버리스 함수로 정하면서 상시 연결이 필요한 WebSocket을 유지할 수 없다는 제약이 드러났다. 서버리스 함수는 요청 단위로 짧게 실행되고 종료되는 모델이라, 연결을 계속 열어두는 방식과 구조적으로 맞지 않기 때문이다. 재검토 결과 UC5도 REST 롱폴링(클라이언트가 응답을 받는 즉시 반복 요청)으로 구현하기로 했다 — 서버가 새 메시지가 생길 때까지 일정 시간 응답을 들고 있다가 돌려주는 방식으로, 매 요청이 독립적인 HTTP 요청-응답이라 서버리스 모델과 충돌하지 않는다(6.2의 `chat.routes.ts` 참조 — 이력 조회/실시간 수신(폴링)/실시간 송신을 모두 이 라우터가 담당).
+  - 이 전환에는 트레이드오프가 있다: 폴링 주기(초 단위) 만큼의 지연이 WebSocket 대비 생기고, 동시 접속자가 늘수록 서버리스 함수 실행 시간·DB 쿼리 수가 WebSocket 대비 늘어난다. MVP 규모에서는 감내 가능하다고 판단했다.
+  - 저장/조회 로직을 도메인 인터페이스 뒤에 둔 원래 설계(2.2 참조) 덕분에, 이 전환도 `domain/chat/chat.repository.ts` 인터페이스와 `chat_messages` 테이블 자체는 건드리지 않고 프레젠테이션 계층(라우트)과 프런트엔드 훅만 교체해 끝났다 — 1.6 원칙("나중에 결정을 바꿀 여지를 구조적으로 남겨두자")이 실제로 작동한 사례다.
 
 ---
 
@@ -234,8 +235,8 @@ frontend/
 │   │       │   ├── ChangeRequestForm.tsx     # 팀원의 변경 요청 작성(UC6)
 │   │       │   └── ChangeRequestApproval.tsx # 팀장의 승인/거절 UI(UC7)
 │   │       ├── hooks/
-│   │       │   └── use-chat-socket.ts        # WebSocket 연결/구독 훅
-│   │       └── api/                 # 채팅 이력 조회, 변경 요청 API 클라이언트
+│   │       │   └── use-chat-polling.ts       # 실시간 채팅 롱폴링 수신/전송 훅(v1.2, WebSocket에서 전환)
+│   │       └── api/                 # 채팅 이력 조회, 롱폴링 수신/전송, 변경 요청 API 클라이언트
 │   │
 │   ├── shared/                      # 여러 feature가 공유하는 것만 위치 (도메인 정렬을 해치지 않는 선에서)
 │   │   ├── components/              # 범용 UI 컴포넌트(Button, Modal 등)
@@ -265,10 +266,7 @@ backend/
 │   │   │       ├── team.routes.ts
 │   │   │       ├── schedule.routes.ts
 │   │   │       ├── change-request.routes.ts
-│   │   │       └── chat.routes.ts           # UC8 채팅 이력 조회 전용 REST — 페이지네이션 쿼리 파라미터 수신 (5.4 참조)
-│   │   └── websocket/
-│   │       ├── chat.gateway.ts          # 실시간 송수신(UC5)만 담당 — 이력 조회(UC8)는 위 chat.routes.ts를 통함. 인증 검사 자체는 ws-auth.guard.ts에 위임
-│   │       └── ws-auth.guard.ts         # 소켓 핸드셰이크 인증 검사 (5.2 참조)
+│   │   │       └── chat.routes.ts           # 이력 조회(UC8, 페이지네이션), 실시간 수신(UC5, 롱폴링), 실시간 송신(UC5) 모두 담당 (5.4 참조, v1.2 — WebSocket에서 REST로 전환)
 │   │
 │   ├── application/                  # 애플리케이션 계층: 유스케이스 오케스트레이션
 │   │   ├── team/
@@ -281,7 +279,8 @@ backend/
 │   │   │   ├── approve-change-request.usecase.ts  # UC7, SC3 핵심 지점
 │   │   │   └── reject-change-request.usecase.ts    # UC7
 │   │   └── chat/
-│   │       ├── send-chat-message.usecase.ts       # UC5, 캘린더-채팅 연동 조율(권한 판단 후 실시간 송신 트리거)
+│   │       ├── send-chat-message.usecase.ts       # UC5, 실시간 송신(POST, chat.routes.ts 경유, v1.2 — 과거 chat.gateway.ts에서 이관)
+│   │       ├── poll-chat-messages.usecase.ts       # UC5, 실시간 수신 롱폴링 — cursor 이후 새 메시지가 생길 때까지 대기 후 응답(v1.2 신규)
 │   │       └── list-chat-history.usecase.ts        # UC8, 채팅 이력 조회(페이지네이션, 5.4/6.2 참조)
 │   │
 │   ├── domain/                       # 도메인 계층: 핵심 규칙, 외부 기술 비의존
@@ -303,16 +302,14 @@ backend/
 │   │   └── permission/
 │   │       └── permission.policy.ts             # canEditSchedule(쓰기 권한), canAccessTeamChat(채팅 접근 — 팀 소속 여부만 확인) 등, 4장 SSOT의 코드상 단일 구현
 │   │
-│   └── infrastructure/               # 인프라 계층: DB, WebSocket 실제 전송 등
+│   └── infrastructure/               # 인프라 계층: DB 접근 등
 │       ├── db/
 │       │   ├── postgres/                        # 확정: PostgreSQL (6-tech-stack.md 4장, 경계 원칙은 5.4/1.3 참조)
 │       │   │   ├── team.repository.impl.ts
 │       │   │   ├── schedule.repository.impl.ts
-│       │   │   ├── chat.repository.impl.ts      # 채팅 이력 저장 — 확장성 고려 지점 (5.4)
+│       │   │   ├── chat.repository.impl.ts      # 채팅 이력 저장/조회 — 실시간 송신(UC5)과 롱폴링 수신(UC5) 모두 이 구현체를 공유(5.4)
 │       │   │   └── change-request.repository.impl.ts
 │       │   └── migrations/
-│       ├── websocket/
-│       │   └── ws-broadcaster.ts                 # 채팅 메시지 실시간 전송 구현
 │       └── config/
 │           └── env.ts                            # 환경변수 로딩/검증 (5.1)
 │
@@ -328,4 +325,4 @@ backend/
 - `application/change-request/approve-change-request.usecase.ts`는 SC3("승인 없이는 일정에 미반영")를 직접 구현하는 지점이므로, 4.3의 코드 리뷰 필수 대상이자 4.2의 단위 테스트 필수 대상이다.
 - `domain/permission/permission.policy.ts`는 4장 권한 SSOT의 코드상 유일한 구현이며, `presentation`과 `infrastructure`는 이 모듈을 우회하여 권한을 재판단하지 않는다.
 - `infrastructure/db/postgres/`는 [6-tech-stack.md](./6-tech-stack.md) 4장의 비교 분석에 따라 확정된 PostgreSQL 구현체이며, 향후 DB를 교체(또는 버전업)하더라도 이 폴더의 구현체만 교체되고 `domain`의 리포지토리 인터페이스와 `application`의 유스케이스는 변경되지 않아야 한다(2.2 의존성 방향 원칙의 실증). 이는 DB가 미확정이라서가 아니라, 확정 이후에도 지켜야 할 경계 원칙이다.
-- `application/chat/send-chat-message.usecase.ts`(UC5)와 `list-chat-history.usecase.ts`(UC8)는 별도 유스케이스로 분리한다: 전자는 실시간 송신 조율(`chat.gateway.ts` 경유), 후자는 페이지네이션 조회(`chat.routes.ts` 경유)로 책임이 다르기 때문이다(5.4 참조). 두 유스케이스 모두 `domain/chat/chat.entity.ts`(일정과의 1:1 관계)와 `chat-message.entity.ts`를 함께 다루되, 도메인 정의서 6장의 "일정 1:1 채팅" 관계는 `chat.entity.ts`에서 표현한다.
+- `application/chat/send-chat-message.usecase.ts`(UC5 송신), `poll-chat-messages.usecase.ts`(UC5 수신), `list-chat-history.usecase.ts`(UC8)는 별도 유스케이스로 분리한다: 각각 실시간 송신, 실시간 수신(대기 포함), 페이지네이션 조회로 책임이 다르기 때문이다(5.4 참조). 셋 다 `chat.routes.ts`(REST)를 경유한다(v1.2 — 과거 실시간 송수신은 `chat.gateway.ts`(WebSocket) 경유였으나 REST로 전환). 세 유스케이스 모두 `domain/chat/chat.entity.ts`(일정과의 1:1 관계)와 `chat-message.entity.ts`를 함께 다루되, 도메인 정의서 6장의 "일정 1:1 채팅" 관계는 `chat.entity.ts`에서 표현한다.

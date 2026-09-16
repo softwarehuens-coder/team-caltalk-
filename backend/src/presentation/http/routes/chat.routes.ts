@@ -6,6 +6,7 @@ import { listChatHistory } from '../../../application/chat/list-chat-history.use
 import { pollChatMessages } from '../../../application/chat/poll-chat-messages.usecase';
 import { sendChatMessage } from '../../../application/chat/send-chat-message.usecase';
 import { respondToDomainError } from '../error-mapper';
+import { isUuid } from '../validation';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -28,7 +29,7 @@ export function createChatRouter(
     const { cursor } = req.query;
     const rawLimit = req.query.limit;
 
-    if (cursor !== undefined && typeof cursor !== 'string') {
+    if (!isUuid(req.params.scheduleId) || (cursor !== undefined && typeof cursor !== 'string')) {
       res.status(400).json({ code: 'INVALID_REQUEST', message: '요청 형식이 올바르지 않습니다.' });
       return;
     }
@@ -66,7 +67,7 @@ export function createChatRouter(
     const { cursor } = req.query;
     const rawTimeout = req.query.timeout;
 
-    if (cursor !== undefined && typeof cursor !== 'string') {
+    if (!isUuid(req.params.scheduleId) || (cursor !== undefined && typeof cursor !== 'string')) {
       res.status(400).json({ code: 'INVALID_REQUEST', message: '요청 형식이 올바르지 않습니다.' });
       return;
     }
@@ -102,7 +103,7 @@ export function createChatRouter(
   // 자신이 보낸 메시지를 다음 poll 응답을 기다리지 않고 즉시 화면에 반영할 수 있게 한다.
   router.post('/schedules/:scheduleId/messages', async (req, res) => {
     const { content } = req.body as { content?: unknown };
-    if (typeof content !== 'string') {
+    if (!isUuid(req.params.scheduleId) || typeof content !== 'string') {
       res.status(400).json({ code: 'INVALID_REQUEST', message: '요청 형식이 올바르지 않습니다.' });
       return;
     }

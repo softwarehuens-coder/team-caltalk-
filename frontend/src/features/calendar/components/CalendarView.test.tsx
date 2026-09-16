@@ -12,6 +12,11 @@ const useCurrentTeamMock = vi.fn();
 const useTeamMembersMock = vi.fn();
 const useCalendarNavigationMock = vi.fn();
 const useTeamSchedulesMock = vi.fn();
+const deleteScheduleMock = vi.fn();
+
+vi.mock('../api/schedule.api', () => ({
+  deleteSchedule: (...args: unknown[]) => deleteScheduleMock(...args),
+}));
 
 vi.mock('../../auth/hooks/use-auth', () => ({
   useAuth: () => useAuthMock(),
@@ -46,14 +51,31 @@ vi.mock('./CalendarToolbar', () => ({
 }));
 
 vi.mock('./MonthGrid', () => ({
-  MonthGrid: (props: { schedulesByDay: Map<string, Schedule[]>; onScheduleClick(schedule: Schedule): void }) => (
-    <div data-testid="month-grid">
+  MonthGrid: (props: {
+    schedulesByDay: Map<string, Schedule[]>;
+    onScheduleClick(schedule: Schedule): void;
+    onScheduleEditClick?(schedule: Schedule): void;
+    onScheduleDeleteClick?(schedule: Schedule): void;
+  }) => (
+    <div data-testid="month-grid" data-edit-enabled={String(Boolean(props.onScheduleEditClick))}>
       {Array.from(props.schedulesByDay.values())
         .flat()
         .map((schedule) => (
-          <button key={schedule.id} type="button" onClick={() => props.onScheduleClick(schedule)}>
-            {schedule.title}
-          </button>
+          <div key={schedule.id}>
+            <button type="button" onClick={() => props.onScheduleClick(schedule)}>
+              {schedule.title}
+            </button>
+            {props.onScheduleEditClick && (
+              <button type="button" onClick={() => props.onScheduleEditClick!(schedule)}>
+                칩수정:{schedule.title}
+              </button>
+            )}
+            {props.onScheduleDeleteClick && (
+              <button type="button" onClick={() => props.onScheduleDeleteClick!(schedule)}>
+                칩삭제:{schedule.title}
+              </button>
+            )}
+          </div>
         ))}
     </div>
   ),
@@ -333,6 +355,72 @@ describe('CalendarView', () => {
     const form = screen.getByTestId('schedule-form');
     expect(form).toHaveAttribute('data-mode', 'edit');
     expect(form).toHaveAttribute('data-schedule-id', 's1');
+  });
+
+  it('LEADER면 캘린더 칩에 수정/삭제 아이콘이 노출된다(MonthGrid에 핸들러 전달)', () => {
+    setupDefaults();
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+
+    renderView();
+
+    expect(screen.getByTestId('month-grid')).toHaveAttribute('data-edit-enabled', 'true');
+  });
+
+  it('MEMBER면 캘린더 칩에 수정/삭제 아이콘을 노출하지 않는다', () => {
+    setupDefaults();
+    useTeamMembersMock.mockReturnValue({ members: [leaderMember('MEMBER')], isLoading: false, error: null, refresh: vi.fn() });
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+
+    renderView();
+
+    expect(screen.getByTestId('month-grid')).toHaveAttribute('data-edit-enabled', 'false');
+  });
+
+  it('칩의 수정 아이콘 클릭 시 채팅 패널 없이 곧바로 mode=edit ScheduleForm이 열린다', async () => {
+    const user = userEvent.setup();
+    setupDefaults();
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+
+    renderView();
+    await user.click(screen.getByRole('button', { name: '칩수정:주간 회의' }));
+
+    expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument();
+    const form = screen.getByTestId('schedule-form');
+    expect(form).toHaveAttribute('data-mode', 'edit');
+    expect(form).toHaveAttribute('data-schedule-id', 's1');
+  });
+
+  it('칩의 삭제 아이콘 클릭 시 확인 후 deleteSchedule을 호출하고 목록을 새로고침한다', async () => {
+    const user = userEvent.setup();
+    const { refresh } = setupDefaults();
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh });
+    deleteScheduleMock.mockResolvedValue(undefined);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderView();
+    await user.click(screen.getByRole('button', { name: '칩삭제:주간 회의' }));
+
+    await waitFor(() => {
+      expect(deleteScheduleMock).toHaveBeenCalledWith('t1', 's1');
+    });
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it('칩의 삭제 확인을 취소하면 deleteSchedule을 호출하지 않는다', async () => {
+    const user = userEvent.setup();
+    setupDefaults();
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderView();
+    await user.click(screen.getByRole('button', { name: '칩삭제:주간 회의' }));
+
+    expect(deleteScheduleMock).not.toHaveBeenCalled();
   });
 
   it('ScheduleChatPanel의 onClose가 호출되면 패널이 닫힌다', async () => {

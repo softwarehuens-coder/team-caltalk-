@@ -8,6 +8,7 @@ import { approveChangeRequest } from '../../../application/change-request/approv
 import { rejectChangeRequest } from '../../../application/change-request/reject-change-request.usecase';
 import { listChangeRequests } from '../../../application/change-request/list-change-requests.usecase';
 import { respondToDomainError } from '../error-mapper';
+import { isUuid } from '../validation';
 
 // swagger/swagger.json의 변경요청 엔드포인트(UC6/UC7, SC3) 계약을 그대로 구현한다.
 export function createChangeRequestRouter(
@@ -21,6 +22,7 @@ export function createChangeRequestRouter(
   router.post('/schedules/:scheduleId/change-requests', async (req, res) => {
     const { desiredStartAt, desiredEndAt, reason } = req.body ?? {};
     if (
+      !isUuid(req.params.scheduleId) ||
       typeof desiredStartAt !== 'string' ||
       typeof desiredEndAt !== 'string' ||
       (reason !== undefined && reason !== null && typeof reason !== 'string')
@@ -50,6 +52,11 @@ export function createChangeRequestRouter(
   });
 
   router.get('/schedules/:scheduleId/change-requests', async (req, res) => {
+    if (!isUuid(req.params.scheduleId)) {
+      res.status(400).json({ code: 'INVALID_REQUEST', message: '요청 형식이 올바르지 않습니다.' });
+      return;
+    }
+
     try {
       const changeRequests = await listChangeRequests(
         scheduleRepository,
@@ -65,6 +72,11 @@ export function createChangeRequestRouter(
   });
 
   router.post('/change-requests/:id/approve', async (req, res) => {
+    if (!isUuid(req.params.id)) {
+      res.status(400).json({ code: 'INVALID_REQUEST', message: '요청 형식이 올바르지 않습니다.' });
+      return;
+    }
+
     try {
       const changeRequest = await approveChangeRequest(
         teamRepository,
@@ -82,7 +94,7 @@ export function createChangeRequestRouter(
 
   router.post('/change-requests/:id/reject', async (req, res) => {
     const { reason } = req.body ?? {};
-    if (typeof reason !== 'string' || reason.length === 0) {
+    if (!isUuid(req.params.id) || typeof reason !== 'string' || reason.length === 0) {
       res.status(400).json({ code: 'INVALID_REQUEST', message: '요청 형식이 올바르지 않습니다.' });
       return;
     }
