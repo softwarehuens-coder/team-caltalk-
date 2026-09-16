@@ -48,7 +48,10 @@ describe('pollChatMessages', () => {
     const teamRepo = fakeTeamRepository({ findMembership: vi.fn().mockResolvedValue(null) });
 
     await expect(
-      pollChatMessages(scheduleRepo, teamRepo, fakeChatRepository(), { ...BASE_INPUT, timeoutMs: 50 }),
+      pollChatMessages(scheduleRepo, teamRepo, fakeChatRepository(), {
+        ...BASE_INPUT,
+        timeoutMs: 50,
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -66,7 +69,15 @@ describe('pollChatMessages', () => {
     const scheduleRepo = fakeScheduleRepository({ findById: vi.fn().mockResolvedValue(SCHEDULE) });
     const teamRepo = fakeTeamRepository({ findMembership: vi.fn().mockResolvedValue(MEMBERSHIP) });
     const page = {
-      data: [{ id: 'msg-1', chatId: 'c1', senderUserId: 'u2', content: '안녕', createdAt: '2026-09-09T00:00:01.000Z' }],
+      data: [
+        {
+          id: 'msg-1',
+          chatId: 'c1',
+          senderUserId: 'u2',
+          content: '안녕',
+          createdAt: '2026-09-09T00:00:01.000Z',
+        },
+      ],
       nextCursor: null,
       hasMore: false,
     };
@@ -90,7 +101,15 @@ describe('pollChatMessages', () => {
     const teamRepo = fakeTeamRepository({ findMembership: vi.fn().mockResolvedValue(MEMBERSHIP) });
     const emptyPage = { data: [], nextCursor: null, hasMore: false };
     const page = {
-      data: [{ id: 'msg-1', chatId: 'c1', senderUserId: 'u2', content: '늦은 메시지', createdAt: '2026-09-09T00:00:01.000Z' }],
+      data: [
+        {
+          id: 'msg-1',
+          chatId: 'c1',
+          senderUserId: 'u2',
+          content: '늦은 메시지',
+          createdAt: '2026-09-09T00:00:01.000Z',
+        },
+      ],
       nextCursor: null,
       hasMore: false,
     };

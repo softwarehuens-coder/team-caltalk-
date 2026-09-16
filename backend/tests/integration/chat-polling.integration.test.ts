@@ -3,7 +3,11 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { testPool } from './support/db';
 import { createApp } from '../../src/app';
-import { registerAndLogin, createTeamWithMembers, type AuthedUser } from './support/scenario-helpers';
+import {
+  registerAndLogin,
+  createTeamWithMembers,
+  type AuthedUser,
+} from './support/scenario-helpers';
 
 // UC5(실시간 채팅)를 과거 WebSocket(chat.gateway.ts, 제거됨) 대신 REST 롱폴링/전송
 // 엔드포인트로 재구현했음을 실제 HTTP 앱 + 실제 DB로 검증한다(chat-gateway.integration.test.ts
@@ -90,7 +94,9 @@ describe('채팅 롱폴링/전송 (통합)', () => {
       .set('Authorization', `Bearer ${member.token}`);
 
     expect(poll.status).toBe(200);
-    expect(poll.body.data.map((m: { content: string }) => m.content)).toContain('이미 존재하는 메시지');
+    expect(poll.body.data.map((m: { content: string }) => m.content)).toContain(
+      '이미 존재하는 메시지',
+    );
     expect(poll.body.data.map((m: { id: string }) => m.id)).toContain(sent.body.id);
   });
 
