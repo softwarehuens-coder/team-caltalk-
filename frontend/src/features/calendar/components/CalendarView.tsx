@@ -20,7 +20,7 @@ export interface CalendarViewProps {
 }
 
 export function CalendarView({ onScheduleClick }: CalendarViewProps) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { team } = useCurrentTeam(user?.id ?? null);
   const { members, error: membersError } = useTeamMembers(team?.id ?? null);
   const { view, anchorDate, periodLabel, dateParam, setView, goPrev, goNext, goToday } = useCalendarNavigation();
@@ -108,35 +108,14 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
     setEditingSchedule(null);
   };
 
-  const header = (
-    <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-      <h1 className="text-lg font-bold text-gray-900">{team ? team.name : 'Team CalTalk'}</h1>
-      <div className="flex items-center gap-3">
-        <Link to="/team" className="text-sm text-primary-600 hover:text-primary-700">
-          팀 관리
-        </Link>
-        <button
-          type="button"
-          onClick={logout}
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-        >
-          로그아웃
-        </button>
-      </div>
-    </div>
-  );
-
   if (team === null) {
     return (
-      <div className="flex min-h-screen flex-col">
-        {header}
-        <div className="mx-auto mt-10 w-full max-w-md p-6">
-          <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-            <p className="text-sm text-gray-700">먼저 팀을 생성하거나 가입해주세요.</p>
-            <Link to="/team" className="mt-3 inline-block text-sm text-primary-600 hover:text-primary-700">
-              팀 관리로 이동
-            </Link>
-          </div>
+      <div className="mx-auto mt-10 w-full max-w-md p-6">
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-700">먼저 팀을 생성하거나 가입해주세요.</p>
+          <Link to="/team" className="mt-3 inline-block text-sm text-primary-600 hover:text-primary-700">
+            팀 관리로 이동
+          </Link>
         </div>
       </div>
     );
@@ -144,21 +123,18 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
 
   if (schedulesError?.status === 403 || membersError?.status === 403) {
     return (
-      <div className="flex min-h-screen flex-col">
-        {header}
-        <div className="mx-auto mt-10 w-full max-w-md p-6">
-          <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-            <p className="text-sm text-gray-700">이 팀의 캘린더에 접근할 권한이 없습니다.</p>
-          </div>
+      <div className="mx-auto mt-10 w-full max-w-md p-6">
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-700">이 팀의 캘린더에 접근할 권한이 없습니다.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {header}
+    <>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-6">
+        <h1 className="text-lg font-bold text-gray-900">{team.name}</h1>
         <CalendarToolbar
           view={view}
           onViewChange={setView}
@@ -214,6 +190,6 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

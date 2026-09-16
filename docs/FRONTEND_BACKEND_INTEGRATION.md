@@ -76,8 +76,11 @@ dev proxy 우회책은 프로덕션에서 전혀 적용되지 않으므로 CORS 
 1. `POST /auth/register` — `{ email, name, password(8자 이상) }` → 201 `User`(`password_hash` 노출 안 됨).
 2. `POST /auth/login` — `{ email, password }` → 200 `{ token, user }`. `token`은 HS256 JWT, 만료 24시간
    (`backend/src/infrastructure/auth/jwt-token.service.ts`).
-3. 프론트는 토큰을 저장(예: 메모리 + `localStorage`)하고, 이후 모든 요청에
-   `Authorization: Bearer <token>` 헤더를 첨부한다.
+3. 프론트는 토큰을 저장(`sessionStorage` — 2026-09-16부터, `token-storage.ts`)하고, 이후 모든 요청에
+   `Authorization: Bearer <token>` 헤더를 첨부한다. `localStorage`는 같은 브라우저의 모든 탭/창이 공유해
+   여러 계정을 탭별로 나눠 테스트할 때 한 탭의 로그인이 다른 탭들의 다음 요청까지 조용히 갈아치우는 문제가
+   있어(`docs/7-execution-plan.md` 9장), 탭 단위로 격리되는 `sessionStorage`로 전환했다 — 같은 탭 새로고침은
+   로그인이 유지되지만, 탭을 닫으면 그 세션은 종료된다.
 4. `GET /health`, `POST /auth/register`, `POST /auth/login`을 제외한 모든 REST 엔드포인트는
    `createAuthMiddleware`(`backend/src/presentation/http/middlewares/auth.middleware.ts`)를 통과해야 한다.
    - `Authorization` 헤더 없음/`Bearer ` 형식 아님 → 401 `{code:"UNAUTHORIZED", message:"인증이 필요합니다."}`
