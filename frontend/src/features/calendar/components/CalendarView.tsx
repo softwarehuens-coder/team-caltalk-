@@ -21,7 +21,7 @@ export interface CalendarViewProps {
 
 export function CalendarView({ onScheduleClick }: CalendarViewProps) {
   const { user, logout } = useAuth();
-  const { team } = useCurrentTeam();
+  const { team } = useCurrentTeam(user?.id ?? null);
   const { members, error: membersError } = useTeamMembers(team?.id ?? null);
   const { view, anchorDate, periodLabel, dateParam, setView, goPrev, goNext, goToday } = useCalendarNavigation();
   const {
