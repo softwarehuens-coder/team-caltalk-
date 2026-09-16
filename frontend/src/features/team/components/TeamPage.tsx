@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/hooks/use-auth';
 import { useCurrentTeam } from '../hooks/use-current-team';
 import type { Team } from '../../../shared/types/team.types';
 import { CreateTeamForm } from './CreateTeamForm';
@@ -6,7 +7,8 @@ import { JoinTeamForm } from './JoinTeamForm';
 import { TeamDashboard } from './TeamDashboard';
 
 export function TeamPage() {
-  const { team, setTeam, clearTeam } = useCurrentTeam();
+  const { user } = useAuth();
+  const { team, setTeam, clearTeam } = useCurrentTeam(user?.id ?? null);
   const navigate = useNavigate();
 
   // 가입 요청이 승인되면(자동 감지 또는 재입력) 팀원을 곧바로 캘린더로 보낸다 —

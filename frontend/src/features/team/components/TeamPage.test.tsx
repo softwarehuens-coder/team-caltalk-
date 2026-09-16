@@ -1,14 +1,19 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Team } from '../../../shared/types/team.types';
 
 const useCurrentTeamMock = vi.fn();
+const useAuthMock = vi.fn();
 
 vi.mock('../hooks/use-current-team', () => ({
   useCurrentTeam: () => useCurrentTeamMock(),
+}));
+
+vi.mock('../../auth/hooks/use-auth', () => ({
+  useAuth: () => useAuthMock(),
 }));
 
 vi.mock('./CreateTeamForm', () => ({
@@ -40,6 +45,17 @@ import { TeamPage } from './TeamPage';
 
 afterEach(() => {
   useCurrentTeamMock.mockReset();
+  useAuthMock.mockReset();
+});
+
+beforeEach(() => {
+  useAuthMock.mockReturnValue({
+    user: { id: 'user-1', email: 'user@example.com', name: '사용자', createdAt: '2026-01-01T00:00:00.000Z' },
+    token: 't',
+    status: 'authenticated',
+    login: vi.fn(),
+    logout: vi.fn(),
+  });
 });
 
 function renderTeamPage(): void {
