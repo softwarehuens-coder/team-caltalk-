@@ -4,16 +4,18 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.0 |
+| 버전 | v1.1 |
 | 작성일 | 2026-09-10 |
+| 최종수정일 | 2026-09-16 |
 | 작성자 | Team CalTalk UI 디자인 |
-| 근거 문서 | 제공된 화면 캡처(대시보드 — 캘린더 + 팀 채팅 화면, 2025년 10월 기준)<br>[8-wireframes.md](./8-wireframes.md) — 구조 와이어프레임(본 문서가 다루는 색상·타이포·여백 등 시각 디자인은 8-wireframes.md 22행에서 명시적으로 범위 밖으로 남겨둔 부분)<br>[4-project-structure.md](./4-project-structure.md) — 프런트엔드 기술 스택(Vite + React 18 + TypeScript) 및 컴포넌트 인벤토리 |
+| 근거 문서 | 제공된 화면 캡처(대시보드 — 캘린더 + 팀 채팅 화면, 2025년 10월 기준)<br>[8-wireframes.md](./8-wireframes.md) — 구조 와이어프레임(본 문서가 다루는 색상·타이포·여백 등 시각 디자인은 8-wireframes.md 1장(개요)에서 명시적으로 범위 밖으로 남겨둔 부분)<br>[4-project-structure.md](./4-project-structure.md) — 프런트엔드 기술 스택(Vite + React 18 + TypeScript) 및 컴포넌트 인벤토리 |
 
 **변경 이력**
 
 | 버전 | 일자 | 변경 내용 |
 |---|---|---|
 | v1.0 | 2026-09-10 | 최초 작성 — 캡처 화면 기준 색상 토큰, 타이포그래피, 컴포넌트별 Tailwind 클래스 정의 |
+| v1.1 | 2026-09-16 | 3.1절 네비게이션 바가 뒤늦게 `AppHeader.tsx`로 구현되면서 함께 만들어진 대시보드 화면(`DashboardPage.tsx`)의 인사말/시계 타이포그래피를 3.5절에 추가(`docs/8-wireframes.md` 2.8절, `docs/7-execution-plan.md` FE-10과 동기화) |
 
 ---
 
@@ -139,6 +141,27 @@ module.exports = {
 ```
 
 - 활성 탭만 `accent-500` 배경 + 흰 텍스트, 나머지는 회색 텍스트.
+
+### 3.5 대시보드 인사말 (`DashboardPage.tsx`)
+
+```html
+<div class="mx-auto flex w-full max-w-5xl items-center justify-between gap-6 p-6">
+  <div class="flex items-center gap-4">
+    <div class="h-10 w-10 shrink-0 rounded-full bg-primary-500"></div>
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">안녕하세요, 원형섭님! 👋</h1>
+      <p class="mt-1 text-sm text-gray-600">오늘은 2025년 10월 06일 월요일이고, 현재 시각은 14:17입니다</p>
+    </div>
+  </div>
+  <div class="shrink-0 text-right">
+    <p class="text-xs text-gray-400">현재 시각</p>
+    <p class="text-lg font-bold text-primary-600">14:17</p>
+  </div>
+</div>
+```
+
+- 아바타는 이미지 없이 `bg-primary-500` 단색 원(`rounded-full`)으로 대체한다(프로필 이미지 업로드는 요구사항으로 확정되기 전까지 추가하지 않는다).
+- 우측 "현재 시각"은 본문의 시각과 같은 값을 굵게(`font-bold text-primary-600`) 한 번 더 강조해 보여주며, 1초 간격으로 갱신된다.
 
 ---
 

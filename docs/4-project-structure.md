@@ -4,9 +4,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.2 |
+| 버전 | v1.3 |
 | 작성일 | 2026-09-07 |
-| 최종수정일 | 2026-09-14 |
+| 최종수정일 | 2026-09-16 |
 | 작성자 | Team CalTalk 아키텍처 리뷰 |
 | 근거 문서 | [1-domain-definition.md](./1-domain-definition.md) (v1.4) — 도메인 용어, 액터/권한 SSOT, 팀 라이프사이클, UC1-UC9, 성공기준 SC1-SC4<br>[2-PRD.md](./2-PRD.md) (v1.0) — MVP 범위, 기능/비기능 요구사항<br>[3-User-scenarios.md](./3-User-scenarios.md) (v1.0) — 실사용 흐름(US-01~US-08)<br>[6-tech-stack.md](./6-tech-stack.md) (v1.0) — 기술 스택 선정 근거(DB 비교·결정 포함) |
 
@@ -17,6 +17,7 @@
 | v1.0 | 2026-09-07 | 최초 작성 |
 | v1.1 | 2026-09-07 | 6-tech-stack.md의 비교 분석 결과를 반영하여 데이터베이스를 PostgreSQL로 확정 — "작업 가정/미확정" 표현을 확정된 결정으로 갱신 |
 | v1.2 | 2026-09-14 | 실시간 채팅(UC5)을 WebSocket에서 REST 롱폴링으로 전환 — Vercel 서버리스 함수 배포와 상시 연결 WebSocket이 맞지 않아 재검토한 결과. `chat.gateway.ts`/`ws-broadcaster.ts`/`ws-auth.guard.ts`/`use-chat-socket.ts` 삭제, `chat.routes.ts`(REST)가 이력 조회·실시간 수신(폴링)·실시간 송신을 모두 담당하도록 5.2/5.4/6.1/6.2절 갱신 |
+| v1.3 | 2026-09-16 | 모든 인증된 화면에 공통 상단 네비게이션(`APP_STYLE_GUIDE.md` 3.1절)을 적용하기 위해 `app/` 아래 `layout/`(`AppHeader.tsx`, `AppLayout.tsx`)과 `pages/`(`DashboardPage.tsx`, 대시보드 홈 화면)를 신설 — 6.1절 프런트엔드 디렉토리 구조 갱신. `routes.tsx`가 `RequireAuth` + `AppLayout`으로 인증된 화면을 한 번에 감싸는 중첩 라우트 구조로 바뀌었고, 캘린더가 `/`에서 `/calendar`로 이동하고 `/`는 새 대시보드 화면이 차지함(`docs/8-wireframes.md` 신설 절과 동기화) |
 
 **전제 및 확정 사항**
 
@@ -206,8 +207,15 @@ frontend/
 ├── src/
 │   ├── app/                        # 앱 진입점, 라우팅, 전역 프로바이더(인증 컨텍스트 등)
 │   │   ├── App.tsx
-│   │   ├── routes.tsx               # UC1 인증 여부에 따른 라우트 가드 포함
-│   │   └── providers/               # 인증/세션 등 전역 컨텍스트 프로바이더
+│   │   ├── routes.tsx               # UC1 인증 여부에 따른 라우트 가드 포함(RequireAuth + AppLayout으로
+│   │   │                             #  인증된 화면을 감싼 뒤 그 안에서 /, /calendar, /team을 분기)
+│   │   ├── providers/               # 인증/세션 등 전역 컨텍스트 프로바이더
+│   │   ├── layout/                  # 모든 인증된 화면이 공유하는 레이아웃(v1.3 신설)
+│   │   │   ├── AppHeader.tsx        # 최상단 네비게이션 바(APP_STYLE_GUIDE.md 3.1절) — 대시보드/팀/
+│   │   │   │                         #  캘린더 링크, 현재 팀 배지, 사용자명, 로그아웃
+│   │   │   └── AppLayout.tsx        # AppHeader + <Outlet />으로 하위 라우트를 감싸는 레이아웃 라우트
+│   │   └── pages/                   # 특정 feature에 속하지 않는 최상위 페이지(v1.3 신설)
+│   │       └── DashboardPage.tsx    # "/" 대시보드 화면 — 인사말, 오늘 날짜, 실시간 시계
 │   │
 │   ├── features/                    # 도메인(유스케이스) 단위 기능 모듈
 │   │   ├── auth/                    # UC1 로그인/인증
