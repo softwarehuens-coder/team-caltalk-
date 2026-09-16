@@ -7,11 +7,11 @@ const USER_STORAGE_KEY = 'team-caltalk:auth-user';
 
 describe('token-storage', () => {
   beforeEach(() => {
-    localStorage.clear();
+    sessionStorage.clear();
   });
 
   afterEach(() => {
-    localStorage.clear();
+    sessionStorage.clear();
   });
 
   describe('getAuthToken', () => {
@@ -20,15 +20,15 @@ describe('token-storage', () => {
     });
 
     it('저장된 토큰이 있으면 해당 값을 반환한다', () => {
-      localStorage.setItem(STORAGE_KEY, 'stored-token');
+      sessionStorage.setItem(STORAGE_KEY, 'stored-token');
       expect(getAuthToken()).toBe('stored-token');
     });
   });
 
   describe('setAuthToken', () => {
-    it('토큰을 localStorage 지정된 키에 저장한다', () => {
+    it('토큰을 sessionStorage 지정된 키에 저장한다', () => {
       setAuthToken('new-token');
-      expect(localStorage.getItem(STORAGE_KEY)).toBe('new-token');
+      expect(sessionStorage.getItem(STORAGE_KEY)).toBe('new-token');
       expect(getAuthToken()).toBe('new-token');
     });
 
@@ -59,25 +59,25 @@ describe('token-storage', () => {
 
     it('저장된 사용자 정보가 있으면 파싱하여 반환한다', () => {
       const user: User = { id: 'u1', email: 'user@test.com', name: '홍길동', createdAt: '2026-01-01T00:00:00.000Z' };
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+      sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
 
       expect(getAuthUser()).toEqual(user);
     });
 
     it('저장된 값이 손상된 JSON이면 null을 반환한다', () => {
-      localStorage.setItem(USER_STORAGE_KEY, '{invalid-json');
+      sessionStorage.setItem(USER_STORAGE_KEY, '{invalid-json');
 
       expect(getAuthUser()).toBeNull();
     });
   });
 
   describe('setAuthUser', () => {
-    it('사용자 정보를 JSON으로 직렬화하여 localStorage 지정된 키에 저장한다', () => {
+    it('사용자 정보를 JSON으로 직렬화하여 sessionStorage 지정된 키에 저장한다', () => {
       const user: User = { id: 'u1', email: 'user@test.com', name: '홍길동', createdAt: '2026-01-01T00:00:00.000Z' };
 
       setAuthUser(user);
 
-      expect(localStorage.getItem(USER_STORAGE_KEY)).toBe(JSON.stringify(user));
+      expect(sessionStorage.getItem(USER_STORAGE_KEY)).toBe(JSON.stringify(user));
       expect(getAuthUser()).toEqual(user);
     });
 
