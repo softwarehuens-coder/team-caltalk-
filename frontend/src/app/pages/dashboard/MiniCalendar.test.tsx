@@ -9,9 +9,7 @@ describe('MiniCalendar', () => {
     render(
       <MiniCalendar
         anchorDate={new Date(2026, 3, 15)}
-        selectedDate={new Date(2026, 3, 15)}
         scheduleDates={new Set()}
-        onSelectDate={vi.fn()}
         onPrevMonth={vi.fn()}
         onNextMonth={vi.fn()}
       />,
@@ -24,38 +22,13 @@ describe('MiniCalendar', () => {
     render(
       <MiniCalendar
         anchorDate={new Date(2026, 3, 15)}
-        selectedDate={new Date(2026, 3, 15)}
         scheduleDates={new Set(['2026-04-20'])}
-        onSelectDate={vi.fn()}
         onPrevMonth={vi.fn()}
         onNextMonth={vi.fn()}
       />,
     );
 
-    const day20 = screen.getByRole('button', { name: '20' });
-    expect(day20.querySelector('.bg-accent-500')).toBeInTheDocument();
-  });
-
-  it('날짜 클릭 시 onSelectDate가 클릭한 날짜로 호출된다', async () => {
-    const user = userEvent.setup();
-    const onSelectDate = vi.fn();
-    render(
-      <MiniCalendar
-        anchorDate={new Date(2026, 3, 15)}
-        selectedDate={new Date(2026, 3, 15)}
-        scheduleDates={new Set()}
-        onSelectDate={onSelectDate}
-        onPrevMonth={vi.fn()}
-        onNextMonth={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByRole('button', { name: '20' }));
-
-    expect(onSelectDate).toHaveBeenCalledTimes(1);
-    const calledDate = onSelectDate.mock.calls[0][0] as Date;
-    expect(calledDate.getDate()).toBe(20);
-    expect(calledDate.getMonth()).toBe(3);
+    expect(screen.getByText('20').parentElement?.querySelector('.bg-accent-500')).toBeInTheDocument();
   });
 
   it('이전/다음 달 버튼 클릭 시 각각의 콜백이 호출된다', async () => {
@@ -65,9 +38,7 @@ describe('MiniCalendar', () => {
     render(
       <MiniCalendar
         anchorDate={new Date(2026, 3, 15)}
-        selectedDate={new Date(2026, 3, 15)}
         scheduleDates={new Set()}
-        onSelectDate={vi.fn()}
         onPrevMonth={onPrevMonth}
         onNextMonth={onNextMonth}
       />,

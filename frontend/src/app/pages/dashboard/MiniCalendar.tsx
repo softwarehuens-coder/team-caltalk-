@@ -4,23 +4,13 @@ const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
 export interface MiniCalendarProps {
   anchorDate: Date;
-  selectedDate: Date;
   scheduleDates: ReadonlySet<string>;
-  onSelectDate(date: Date): void;
   onPrevMonth(): void;
   onNextMonth(): void;
 }
 
-export function MiniCalendar({
-  anchorDate,
-  selectedDate,
-  scheduleDates,
-  onSelectDate,
-  onPrevMonth,
-  onNextMonth,
-}: MiniCalendarProps) {
+export function MiniCalendar({ anchorDate, scheduleDates, onPrevMonth, onNextMonth }: MiniCalendarProps) {
   const days = getMonthGridDays(anchorDate);
-  const selectedKey = formatDateParam(selectedDate);
 
   return (
     <div>
@@ -56,31 +46,18 @@ export function MiniCalendar({
         {days.map((day) => {
           const key = formatDateParam(day);
           const isOtherMonth = day.getMonth() !== anchorDate.getMonth();
-          const isSelected = key === selectedKey;
           const hasSchedule = scheduleDates.has(key);
 
           return (
-            <button
+            <div
               key={key}
-              type="button"
-              onClick={() => onSelectDate(day)}
               className={`mx-auto flex h-7 w-7 flex-col items-center justify-center rounded-full ${
-                isSelected
-                  ? 'bg-primary-600 font-bold text-white'
-                  : isToday(day)
-                    ? 'font-bold text-primary-600'
-                    : isOtherMonth
-                      ? 'text-gray-300'
-                      : 'text-gray-700'
+                isToday(day) ? 'font-bold text-primary-600' : isOtherMonth ? 'text-gray-300' : 'text-gray-700'
               }`}
             >
               {day.getDate()}
-              <span
-                className={`-mt-0.5 h-1 w-1 rounded-full ${
-                  hasSchedule ? (isSelected ? 'bg-white' : 'bg-accent-500') : 'bg-transparent'
-                }`}
-              />
-            </button>
+              <span className={`-mt-0.5 h-1 w-1 rounded-full ${hasSchedule ? 'bg-accent-500' : 'bg-transparent'}`} />
+            </div>
           );
         })}
       </div>

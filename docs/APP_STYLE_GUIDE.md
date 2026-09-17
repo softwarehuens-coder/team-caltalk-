@@ -4,9 +4,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.2 |
+| 버전 | v1.3 |
 | 작성일 | 2026-09-10 |
-| 최종수정일 | 2026-09-16 |
+| 최종수정일 | 2026-09-17 |
 | 작성자 | Team CalTalk UI 디자인 |
 | 근거 문서 | 제공된 화면 캡처(대시보드 — 캘린더 + 팀 채팅 화면, 2025년 10월 기준)<br>[8-wireframes.md](./8-wireframes.md) — 구조 와이어프레임(본 문서가 다루는 색상·타이포·여백 등 시각 디자인은 8-wireframes.md 1장(개요)에서 명시적으로 범위 밖으로 남겨둔 부분)<br>[4-project-structure.md](./4-project-structure.md) — 프런트엔드 기술 스택(Vite + React 18 + TypeScript) 및 컴포넌트 인벤토리 |
 
@@ -17,6 +17,7 @@
 | v1.0 | 2026-09-10 | 최초 작성 — 캡처 화면 기준 색상 토큰, 타이포그래피, 컴포넌트별 Tailwind 클래스 정의 |
 | v1.1 | 2026-09-16 | 3.1절 네비게이션 바가 뒤늦게 `AppHeader.tsx`로 구현되면서 함께 만들어진 대시보드 화면(`DashboardPage.tsx`)의 인사말/시계 타이포그래피를 3.5절에 추가(`docs/8-wireframes.md` 2.8절, `docs/7-execution-plan.md` FE-10과 동기화) |
 | v1.2 | 2026-09-16 | 3.5절에 대시보드 일정 카드(미니 캘린더 + 일정 목록)와 내 팀 카드(팀 정보 + 구성원 목록) 마크업 추가 |
+| v1.3 | 2026-09-17 | 3.6절 일정 카드 마크업을 "선택한 날짜의 일정만" 표시하던 것에서 "해당 월 전체 일정을 참여자 이름까지" 표시하도록 갱신, 미니 캘린더의 날짜 선택 스타일 설명 제거 |
 
 ---
 
@@ -173,22 +174,28 @@ module.exports = {
     <button class="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50">오늘</button>
   </div>
   <div class="flex flex-col gap-4 sm:flex-row">
-    <!-- 미니 캘린더: 선택된 날짜는 primary-600 원 배경, 오늘은 primary-600 굵은 텍스트,
-         일정이 있는 날짜는 accent-500 점(선택된 날짜 위에서는 흰 점) -->
+    <!-- 미니 캘린더: 오늘은 primary-600 굵은 텍스트, 일정이 있는 날짜는 accent-500 점.
+         날짜 클릭/선택 기능은 없다(순수 월 표시 전용) -->
     <div class="shrink-0 sm:w-64"><!-- MiniCalendar --></div>
     <div class="flex flex-1 flex-col gap-2 border-t border-gray-100 pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-      <p class="text-xs text-gray-400">4월 15일 일정 2건</p>
-      <div class="rounded-md bg-gray-50 px-3 py-2">
-        <p class="truncate text-sm font-medium text-gray-900">주간 정기 회의</p>
-        <p class="mt-0.5 text-xs text-gray-500">10:00 ~ 11:00 · 참여 3명</p>
-      </div>
+      <p class="text-xs text-gray-400">4월 일정 2건</p>
+      <ul class="flex max-h-80 flex-col gap-2 overflow-y-auto">
+        <li class="rounded-md bg-gray-50 px-3 py-2">
+          <div class="flex items-baseline justify-between gap-2">
+            <p class="truncate text-sm font-medium text-gray-900">주간 정기 회의</p>
+            <span class="shrink-0 text-xs text-gray-400">4월 15일</span>
+          </div>
+          <p class="mt-0.5 text-xs text-gray-500">10:00 ~ 11:00 · 참여 3명 (지훈, 서연, 민준)</p>
+        </li>
+      </ul>
     </div>
   </div>
 </div>
 ```
 
 - 좁은 화면(`sm` 미만)에서는 캘린더와 일정 목록이 세로로 쌓이고(`flex-col`), `sm` 이상에서는 좌우로 배치된다(`sm:flex-row`).
-- 일정 목록 항목은 캘린더 그리드의 일정 칩(4장)과 달리 `bg-gray-50` 배경의 카드형으로, 제목(`text-sm font-medium`) 아래 시간·참여 인원을 `text-xs text-gray-500`으로 보조 표시한다.
+- 일정 목록은 **선택한 날짜가 아니라 해당 월에 속한 모든 일정**을 시작 시각순으로 보여준다. 목록이 길어지면 카드 높이가 무한정 늘어나지 않도록 `max-h-80 overflow-y-auto`로 스크롤 처리한다.
+- 일정 목록 항목은 캘린더 그리드의 일정 칩(4장)과 달리 `bg-gray-50` 배경의 카드형으로, 제목(`text-sm font-medium`)과 날짜를 한 줄에 배치하고 그 아래 시간·참여 인원 수·참여자 이름을 `text-xs text-gray-500`으로 보조 표시한다. 참여자 이름은 팀원 목록(`useTeamMembers`)에서 `userId`로 조회하며, 여러 날에 걸친 일정은 날짜를 "4월 21일 ~ 4월 24일"처럼 범위로 표시한다.
 
 ### 3.7 내 팀 카드 (`MyTeamCard.tsx`)
 
