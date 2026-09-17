@@ -4,7 +4,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.1 |
+| 버전 | v1.2 |
 | 작성일 | 2026-09-10 |
 | 최종수정일 | 2026-09-16 |
 | 작성자 | Team CalTalk UI 디자인 |
@@ -16,6 +16,7 @@
 |---|---|---|
 | v1.0 | 2026-09-10 | 최초 작성 — 캡처 화면 기준 색상 토큰, 타이포그래피, 컴포넌트별 Tailwind 클래스 정의 |
 | v1.1 | 2026-09-16 | 3.1절 네비게이션 바가 뒤늦게 `AppHeader.tsx`로 구현되면서 함께 만들어진 대시보드 화면(`DashboardPage.tsx`)의 인사말/시계 타이포그래피를 3.5절에 추가(`docs/8-wireframes.md` 2.8절, `docs/7-execution-plan.md` FE-10과 동기화) |
+| v1.2 | 2026-09-16 | 3.5절에 대시보드 일정 카드(미니 캘린더 + 일정 목록)와 내 팀 카드(팀 정보 + 구성원 목록) 마크업 추가 |
 
 ---
 
@@ -162,6 +163,56 @@ module.exports = {
 
 - 아바타는 이미지 없이 `bg-primary-500` 단색 원(`rounded-full`)으로 대체한다(프로필 이미지 업로드는 요구사항으로 확정되기 전까지 추가하지 않는다).
 - 우측 "현재 시각"은 본문의 시각과 같은 값을 굵게(`font-bold text-primary-600`) 한 번 더 강조해 보여주며, 1초 간격으로 갱신된다.
+
+### 3.6 대시보드 일정 카드 (`ScheduleOverviewCard.tsx`, `MiniCalendar.tsx`)
+
+```html
+<div class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4">
+  <div class="flex items-center justify-between">
+    <h2 class="text-base font-semibold text-gray-900">일정</h2>
+    <button class="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50">오늘</button>
+  </div>
+  <div class="flex flex-col gap-4 sm:flex-row">
+    <!-- 미니 캘린더: 선택된 날짜는 primary-600 원 배경, 오늘은 primary-600 굵은 텍스트,
+         일정이 있는 날짜는 accent-500 점(선택된 날짜 위에서는 흰 점) -->
+    <div class="shrink-0 sm:w-64"><!-- MiniCalendar --></div>
+    <div class="flex flex-1 flex-col gap-2 border-t border-gray-100 pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+      <p class="text-xs text-gray-400">4월 15일 일정 2건</p>
+      <div class="rounded-md bg-gray-50 px-3 py-2">
+        <p class="truncate text-sm font-medium text-gray-900">주간 정기 회의</p>
+        <p class="mt-0.5 text-xs text-gray-500">10:00 ~ 11:00 · 참여 3명</p>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+- 좁은 화면(`sm` 미만)에서는 캘린더와 일정 목록이 세로로 쌓이고(`flex-col`), `sm` 이상에서는 좌우로 배치된다(`sm:flex-row`).
+- 일정 목록 항목은 캘린더 그리드의 일정 칩(4장)과 달리 `bg-gray-50` 배경의 카드형으로, 제목(`text-sm font-medium`) 아래 시간·참여 인원을 `text-xs text-gray-500`으로 보조 표시한다.
+
+### 3.7 내 팀 카드 (`MyTeamCard.tsx`)
+
+```html
+<div class="rounded-lg border border-gray-200 bg-white p-4">
+  <div class="flex items-baseline justify-between">
+    <h2 class="text-base font-semibold text-gray-900">디자인팀</h2>
+    <span class="text-xs text-gray-400">가입일 2026. 3. 1.</span>
+  </div>
+  <ul class="mt-3 flex flex-col divide-y divide-gray-100">
+    <li class="flex items-center justify-between py-2">
+      <span class="flex items-center gap-1">
+        <span class="text-sm text-gray-700">지훈</span>
+        <span class="text-xs text-gray-400">(나)</span>
+      </span>
+      <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">LEADER</span>
+    </li>
+  </ul>
+</div>
+```
+
+- 팀 이름은 3.2절 "팀 타이틀 바"와 동일한 `text-base font-semibold`를 쓴다(카드 컨텍스트라 3.2의 `text-lg`보다 한 단계 작다).
+- 구성원 행 구분은 `divide-y divide-gray-100`으로 처리하고, 역할 배지는 2.7절 팀 관리 화면과 동일한 스타일(`rounded-full bg-gray-100`)을 재사용한다.
+- **탈퇴일은 표시하지 않는다** — `team_memberships`는 탈퇴 시 행이 삭제되는 구조라 저장된 값이 없고, 이 카드는 현재 소속된 팀만 보여주므로 개념적으로도 필요 없다(`docs/7-execution-plan.md` FE-10 참조).
 
 ---
 

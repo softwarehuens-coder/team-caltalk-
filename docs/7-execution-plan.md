@@ -4,11 +4,11 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.3 |
+| 버전 | v1.4 |
 | 작성일 | 2026-09-09 |
 | 최종수정일 | 2026-09-16 |
 | 작성자 | Team CalTalk 실행계획 수립 |
-| 근거 문서 | [1-domain-definition.md](./1-domain-definition.md) (v1.4)<br>[2-PRD.md](./2-PRD.md) (v1.0)<br>[3-User-scenarios.md](./3-User-scenarios.md)<br>[4-project-structure.md](./4-project-structure.md) (v1.1)<br>[5-arch-diagram.md](./5-arch-diagram.md)<br>[6-tech-stack.md](./6-tech-stack.md) (v1.0)<br>[database/schema.sql](../database/schema.sql) — 데이터 모델의 실질적 근거(구 7-erd.md 대체)<br>[swagger/swagger.json](../swagger/swagger.json) — API 계약의 실질적 근거(v1.1부터 다시 존재 및 유지 중) |
+| 근거 문서 | [1-domain-definition.md](./1-domain-definition.md) (v1.4)<br>[2-PRD.md](./2-PRD.md) (v1.0)<br>[3-User-scenarios.md](./3-User-scenarios.md)<br>[4-project-structure.md](./4-project-structure.md) (v1.3)<br>[5-arch-diagram.md](./5-arch-diagram.md)<br>[6-tech-stack.md](./6-tech-stack.md) (v1.0)<br>[APP_STYLE_GUIDE.md](./APP_STYLE_GUIDE.md) (v1.2) — FE-10 대시보드 화면의 시각 디자인 근거<br>[database/schema.sql](../database/schema.sql) — 데이터 모델의 실질적 근거(구 7-erd.md 대체)<br>[swagger/swagger.json](../swagger/swagger.json) — API 계약의 실질적 근거(v1.1부터 다시 존재 및 유지 중) |
 
 **변경 이력**
 
@@ -18,6 +18,7 @@
 | v1.1 | 2026-09-14 | DB-1~DB-6·BE-1~BE-10·FE-0~FE-9 전체 구현 및 테스트 완료를 반영해 완료 조건 체크박스를 전부 [x]로 갱신. `swagger/swagger.json`이 재도입되어 실제 API 계약으로 유지되고 있음을 반영(0장 "이전 실행계획과의 차이"/"추가 안내" 문단 갱신). 실사용 중 발견되어 BE-4/BE-7에 추가된 엔드포인트(`GET /teams/{teamId}`, `GET /teams/{teamId}/join-requests`, `GET /schedules/{scheduleId}/change-requests`) 반영 및 "7. 구현 후 발견된 갭" 절 신설(2026-09-14 브라우저 E2E 검증 결과, `.scratch_issues/dev-log.md` 근거) |
 | v1.2 | 2026-09-16 | 2026-09-16 브라우저 수동 테스트(성능 테스트 포함)에서 추가로 발견된 갭 4건을 "8. 2026-09-16 발견된 추가 갭" 절로 신설: (1) 팀 ID를 팀장이 팀원에게 전달할 UI 부재 → `TeamIdCopyButton.tsx` 추가, (2) `GET /teams/{teamId}` 보완 이후에도 가입 승인 후 팀원 화면이 자동 전환되지 않던 잔여 갭 → `JoinTeamForm.tsx` 자동 승인 감지 폴링 + 캘린더 자동 이동, (3) 채팅 롱폴링에서 `createdAt` 밀리초 절삭으로 인한 무한 재수신 폭주(BE-8 완료조건이 전제한 "정상 동작"이 실제로는 폭주였음) → `chat.repository.impl.ts`가 커서/표시값 모두 마이크로초 정밀도로 통일, (4) 일정 수정 폼이 채팅 패널에 z-index로 가려지던 버그 및 캘린더에서 채팅 없이 직접 수정/삭제할 수단 부재 → z-index 수정 + `ScheduleChip.tsx` 수정/삭제 아이콘 추가(`docs/8-wireframes.md` 2.2/2.7 동기화) |
 | v1.3 | 2026-09-16 | 같은 날 후속 세션에서 발견된 계정 격리 버그 2건과 일정 표시 버그 1건을 "9. 2026-09-16 세션 후반부" 절로 신설: (1) 팀 선택 상태가 `localStorage` 전역 키에 저장돼 같은 브라우저의 다른 계정과 공유되던 문제 → 계정별 키로 분리(PR #59), (2) 인증 토큰이 `localStorage`에 저장돼 같은 브라우저의 여러 탭이 공유하던 문제 → `sessionStorage`로 전환(PR #60), (3) 여러 날짜에 걸친 일정이 시작일에만 표시되던 문제 → `groupSchedulesByDay`가 종료일까지 매일 버킷팅하도록 수정(PR #61). 4장에 FE-10(공통 상단 헤더 + 대시보드 화면, UC 범위 밖 추가) 신설 및 `docs/8-wireframes.md` 2.8절과 동기화 |
+| v1.4 | 2026-09-16 | 사용자 요청(참고 화면 캡처)에 따라 FE-10 대시보드 화면을 확장: 일정 카드(미니 캘린더 + 선택 날짜의 일정 시간/참여인원)와 내 팀 카드(팀 이름/내 가입일/구성원 목록) 추가. 탈퇴일은 `team_memberships`가 탈퇴 시 행을 삭제하는 구조라 저장/표시 대상이 아님을 확인하고 완료조건에 명시(스키마 변경 없이 처리, 사용자 확인 완료). `docs/8-wireframes.md` 2.8절, `docs/APP_STYLE_GUIDE.md` 3.5절과 동기화 |
 
 ## 0. 개요
 
@@ -564,9 +565,17 @@ UC1-UC9/PRD MoSCoW 어디에도 없던 항목으로, `APP_STYLE_GUIDE.md`(제공
       갱신)을 표시
 - [x] 캘린더 화면이 `/`에서 `/calendar`로 이동하고, `CalendarView.tsx`의 기존 자체 헤더(로고/로그아웃/팀
       관리 링크)는 공통 헤더와 중복되므로 제거
+- [x] (2026-09-16 확장) `app/pages/dashboard/ScheduleOverviewCard.tsx`가 미니 캘린더(`MiniCalendar.tsx`)와
+      선택한 날짜의 일정 목록(제목/시간 `HH:mm ~ HH:mm`/참여 인원 수)을 함께 표시 — 월 이동, 날짜 선택,
+      "오늘" 버튼으로 오늘 날짜 복귀, 일정이 있는 날짜에는 점 표시
+- [x] (2026-09-16 확장) `app/pages/dashboard/MyTeamCard.tsx`가 현재 소속 팀 이름, 로그인 사용자 본인의
+      가입일, 팀 구성원 전체 목록(이름/역할)을 표시. **탈퇴일은 의도적으로 미표시** —
+      `team_memberships`는 탈퇴 시 행이 삭제되는 구조라 탈퇴일을 저장하지 않고, 이 카드는 애초에 현재
+      소속 팀만 보여주므로 개념적으로도 필요 없음(사용자 확인 완료, 스키마/백엔드 변경 없이 처리)
+- [x] 두 카드 모두 소속된 팀이 없으면 팀 관리 화면으로 이동하는 안내만 표시(빈 상태)
 
 **의존성**
-- [x] FE-1(인증 컨텍스트), FE-2(현재 팀 컨텍스트), FE-3(캘린더 화면 존재)
+- [x] FE-1(인증 컨텍스트), FE-2(현재 팀 컨텍스트), FE-3(캘린더 화면 존재, `groupSchedulesByDay` 재사용)
 
 **예상 규모**: S
 
