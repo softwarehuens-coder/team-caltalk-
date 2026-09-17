@@ -8,6 +8,15 @@ vi.mock('../../features/auth/hooks/use-auth', () => ({
   useAuth: () => useAuthMock(),
 }));
 
+// 위젯 카드는 각자의 테스트 파일에서 검증한다 — 여기서는 인사말/시계만 확인한다.
+vi.mock('./dashboard/ScheduleOverviewCard', () => ({
+  ScheduleOverviewCard: () => <div data-testid="schedule-overview-card" />,
+}));
+
+vi.mock('./dashboard/MyTeamCard', () => ({
+  MyTeamCard: () => <div data-testid="my-team-card" />,
+}));
+
 import { DashboardPage } from './DashboardPage';
 
 afterEach(() => {

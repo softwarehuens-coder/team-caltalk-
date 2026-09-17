@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addDays, addMonths, formatDateParam, getMonthGridDays, getWeekDays, isSameDay, isToday } from './calendar-date.util';
+import {
+  addDays,
+  addMonths,
+  formatDateParam,
+  formatTime,
+  getMonthGridDays,
+  getWeekDays,
+  isSameDay,
+  isToday,
+} from './calendar-date.util';
 
 describe('addDays', () => {
   it('n일 만큼 더한 날짜를 반환한다', () => {
@@ -88,5 +97,15 @@ describe('isToday', () => {
 
   it('오늘이 아니면 false를 반환한다', () => {
     expect(isToday(new Date(2026, 3, 16))).toBe(false);
+  });
+});
+
+describe('formatTime', () => {
+  it('HH:mm 형식으로 zero-padding하여 반환한다', () => {
+    expect(formatTime(new Date(2026, 3, 15, 9, 5))).toBe('09:05');
+  });
+
+  it('자정도 00:00으로 표시한다', () => {
+    expect(formatTime(new Date(2026, 3, 15, 0, 0))).toBe('00:00');
   });
 });
