@@ -4,9 +4,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.4 |
+| 버전 | v1.5 |
 | 작성일 | 2026-09-07 |
-| 최종수정일 | 2026-09-16 |
+| 최종수정일 | 2026-09-17 |
 | 작성자 | Team CalTalk 아키텍처 리뷰 |
 | 근거 문서 | [1-domain-definition.md](./1-domain-definition.md) (v1.4) — 도메인 용어, 액터/권한 SSOT, 팀 라이프사이클, UC1-UC9, 성공기준 SC1-SC4<br>[2-PRD.md](./2-PRD.md) (v1.0) — MVP 범위, 기능/비기능 요구사항<br>[3-User-scenarios.md](./3-User-scenarios.md) (v1.0) — 실사용 흐름(US-01~US-08)<br>[6-tech-stack.md](./6-tech-stack.md) (v1.0) — 기술 스택 선정 근거(DB 비교·결정 포함) |
 
@@ -19,6 +19,7 @@
 | v1.2 | 2026-09-14 | 실시간 채팅(UC5)을 WebSocket에서 REST 롱폴링으로 전환 — Vercel 서버리스 함수 배포와 상시 연결 WebSocket이 맞지 않아 재검토한 결과. `chat.gateway.ts`/`ws-broadcaster.ts`/`ws-auth.guard.ts`/`use-chat-socket.ts` 삭제, `chat.routes.ts`(REST)가 이력 조회·실시간 수신(폴링)·실시간 송신을 모두 담당하도록 5.2/5.4/6.1/6.2절 갱신 |
 | v1.3 | 2026-09-16 | 모든 인증된 화면에 공통 상단 네비게이션(`APP_STYLE_GUIDE.md` 3.1절)을 적용하기 위해 `app/` 아래 `layout/`(`AppHeader.tsx`, `AppLayout.tsx`)과 `pages/`(`DashboardPage.tsx`, 대시보드 홈 화면)를 신설 — 6.1절 프런트엔드 디렉토리 구조 갱신. `routes.tsx`가 `RequireAuth` + `AppLayout`으로 인증된 화면을 한 번에 감싸는 중첩 라우트 구조로 바뀌었고, 캘린더가 `/`에서 `/calendar`로 이동하고 `/`는 새 대시보드 화면이 차지함(`docs/8-wireframes.md` 신설 절과 동기화) |
 | v1.4 | 2026-09-16 | `app/pages/DashboardPage.tsx`가 일정 카드/내 팀 카드를 포함하도록 확장되면서 `app/pages/dashboard/`(`ScheduleOverviewCard.tsx`, `MiniCalendar.tsx`, `MyTeamCard.tsx`) 하위 폴더가 생겨 6.1절 갱신 |
+| v1.5 | 2026-09-17 | 사용자 요청에 따라 일정 카드의 상호작용 방식을 "날짜 클릭 후 그 날의 일정만 조회"에서 "해당 월의 모든 일정을 참여인원 이름까지 포함해 목록으로 항상 표시"로 변경 — `MiniCalendar.tsx`에서 날짜 선택(`selectedDate`/`onSelectDate`) 기능 제거(순수 월 표시 전용), `ScheduleOverviewCard.tsx`가 `useTeamMembers`로 참여자 이름을 조회해 함께 표시하도록 6.1절 주석 갱신. 대시보드 채팅 요약("메모란") 및 팀장 다중 팀 생성 허용은 이번 세션에서 검토했으나 보류(전자는 LLM 연동/자격증명 부재, 후자는 사용자 요청으로 제외) |
 
 **전제 및 확정 사항**
 
@@ -218,8 +219,8 @@ frontend/
 │   │   └── pages/                   # 특정 feature에 속하지 않는 최상위 페이지(v1.3 신설)
 │   │       ├── DashboardPage.tsx    # "/" 대시보드 화면 — 인사말, 오늘 날짜, 실시간 시계
 │   │       └── dashboard/           # 대시보드 전용 위젯(v1.4 신설, 다른 화면에서는 쓰지 않음)
-│   │           ├── ScheduleOverviewCard.tsx  # 미니 캘린더 + 선택 날짜의 일정(시간/참여인원)
-│   │           ├── MiniCalendar.tsx          # 월 이동/날짜 선택 가능한 소형 캘린더 그리드
+│   │           ├── ScheduleOverviewCard.tsx  # 미니 캘린더 + 해당 월 전체 일정(시간/참여인원 이름)
+│   │           ├── MiniCalendar.tsx          # 월 이동 가능한 소형 캘린더 그리드(날짜 선택 없음, 일정 있는 날 점 표시만)
 │   │           └── MyTeamCard.tsx            # 현재 팀 이름/내 가입일/구성원 목록
 │   │
 │   ├── features/                    # 도메인(유스케이스) 단위 기능 모듈
