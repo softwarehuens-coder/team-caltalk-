@@ -2,7 +2,7 @@ import type { ScheduleRepository } from '../../domain/schedule/schedule.reposito
 import type { TeamRepository } from '../../domain/team/team.repository';
 import type { ChatRepository } from '../../domain/chat/chat.repository';
 import type { PaginatedChatMessages } from '../../domain/chat/chat-message.entity';
-import { canAccessTeamChat } from '../../domain/permission/permission.policy';
+import { canAccessScheduleChat } from '../../domain/permission/permission.policy';
 import { NotFoundError, ForbiddenError } from '../../domain/shared/http-errors';
 
 export interface ListChatHistoryInput {
@@ -27,7 +27,8 @@ export async function listChatHistory(
   }
 
   const membership = await teamRepository.findMembership(schedule.teamId, input.actorUserId);
-  if (!canAccessTeamChat(membership?.role ?? null)) {
+  const isParticipant = schedule.participants.some((p) => p.userId === input.actorUserId);
+  if (!canAccessScheduleChat(membership?.role ?? null, isParticipant)) {
     throw new ForbiddenError('FORBIDDEN', '해당 채팅에 접근할 권한이 없습니다.');
   }
 

@@ -21,7 +21,6 @@ export interface ScheduleChatPanelProps {
 }
 
 const MAX_MESSAGE_LENGTH = 500;
-const CHANGE_REQUESTS_POLL_INTERVAL_MS = 5000;
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString('ko-KR');
@@ -148,17 +147,6 @@ export function ScheduleChatPanel({ schedule, members, isLeader, onClose, onEdit
     return () => {
       cancelled = true;
     };
-  }, [schedule.id]);
-
-  // 다른 사용자가 제출한 변경 요청이나 팀장의 승인/거절 결과가 새로고침 없이
-  // 반영되도록 주기적으로 다시 조회한다(서버가 SSOT).
-  useEffect(() => {
-    const timer = setInterval(() => {
-      listChangeRequests(schedule.id)
-        .then((result) => setPendingChangeRequests(result))
-        .catch((error) => console.error('Failed to refresh change requests:', error));
-    }, CHANGE_REQUESTS_POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
   }, [schedule.id]);
 
   const refreshHistory = () => {

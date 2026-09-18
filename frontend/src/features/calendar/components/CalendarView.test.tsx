@@ -324,10 +324,9 @@ describe('CalendarView', () => {
     expect(screen.getByTestId('schedule-form')).toHaveAttribute('data-mode', 'create');
   });
 
-  it('일정을 클릭하면 역할과 무관하게 ScheduleChatPanel을 렌더링하고 selectedScheduleId에 매칭되는 일정을 전달한다', async () => {
+  it('LEADER는 참여자가 아닌 일정도 클릭하면 ScheduleChatPanel을 렌더링하고 selectedScheduleId에 매칭되는 일정을 전달한다', async () => {
     const user = userEvent.setup();
     setupDefaults();
-    useTeamMembersMock.mockReturnValue({ members: [leaderMember('MEMBER')], isLoading: false, error: null, refresh: vi.fn() });
     const schedule = buildSchedule('s1', '주간 회의');
     useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
 
@@ -339,6 +338,37 @@ describe('CalendarView', () => {
 
     const panel = screen.getByTestId('chat-panel');
     expect(panel).toHaveAttribute('data-schedule-id', 's1');
+  });
+
+  it('MEMBER가 참여자로 등록된 일정을 클릭하면 ScheduleChatPanel을 렌더링한다', async () => {
+    const user = userEvent.setup();
+    setupDefaults();
+    useTeamMembersMock.mockReturnValue({ members: [leaderMember('MEMBER')], isLoading: false, error: null, refresh: vi.fn() });
+    const schedule = buildSchedule('s1', '주간 회의', {
+      participants: [{ id: 'p1', scheduleId: 's1', userId: 'u1', createdAt: '2026-04-01T00:00:00.000Z' }],
+    });
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+
+    renderView();
+    await user.click(screen.getByRole('button', { name: '주간 회의' }));
+
+    const panel = screen.getByTestId('chat-panel');
+    expect(panel).toHaveAttribute('data-schedule-id', 's1');
+  });
+
+  it('2026-09-18 정책 변경: MEMBER가 참여자가 아닌 일정을 클릭하면 입장을 막고 안내 메시지를 띄운다', async () => {
+    const user = userEvent.setup();
+    setupDefaults();
+    useTeamMembersMock.mockReturnValue({ members: [leaderMember('MEMBER')], isLoading: false, error: null, refresh: vi.fn() });
+    const schedule = buildSchedule('s1', '주간 회의');
+    useTeamSchedulesMock.mockReturnValue({ schedules: [schedule], isLoading: false, error: null, refresh: vi.fn() });
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+    renderView();
+    await user.click(screen.getByRole('button', { name: '주간 회의' }));
+
+    expect(alertSpy).toHaveBeenCalledWith('참여자로 등록된 일정만 채팅에 입장할 수 있습니다.');
+    expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument();
   });
 
   it('ScheduleChatPanel의 onEditClick이 호출되면 mode=edit으로 ScheduleForm이 열린다', async () => {

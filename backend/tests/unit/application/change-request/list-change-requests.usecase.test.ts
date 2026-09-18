@@ -16,6 +16,11 @@ const SCHEDULE = {
   participants: [],
 };
 
+const SCHEDULE_WITH_MEMBER_PARTICIPANT = {
+  ...SCHEDULE,
+  participants: [{ id: 'p1', scheduleId: 's1', userId: 'u1', createdAt: '2026-09-09T00:00:00.000Z' }],
+};
+
 const INPUT = { scheduleId: 's1', actorUserId: 'u1' };
 
 describe('listChangeRequests', () => {
@@ -27,13 +32,50 @@ describe('listChangeRequests', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('팀 비소속(canAccessTeamChat 실패)이면 ForbiddenError', async () => {
+  it('팀 비소속(canAccessScheduleChat 실패)이면 ForbiddenError', async () => {
     const scheduleRepo = fakeScheduleRepository({ findById: vi.fn().mockResolvedValue(SCHEDULE) });
     const teamRepo = fakeTeamRepository({ findMembership: vi.fn().mockResolvedValue(null) });
 
     await expect(
       listChangeRequests(scheduleRepo, teamRepo, fakeChangeRequestRepository(), INPUT),
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('2026-09-18 정책 변경: 팀원이지만 해당 일정 참여자가 아니면 ForbiddenError', async () => {
+    const scheduleRepo = fakeScheduleRepository({ findById: vi.fn().mockResolvedValue(SCHEDULE) });
+    const teamRepo = fakeTeamRepository({
+      findMembership: vi.fn().mockResolvedValue({
+        id: 'm1',
+        teamId: 'team-1',
+        userId: 'u1',
+        role: 'MEMBER',
+        createdAt: '2026-09-09T00:00:00.000Z',
+      }),
+    });
+
+    await expect(
+      listChangeRequests(scheduleRepo, teamRepo, fakeChangeRequestRepository(), INPUT),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('참여자인 팀원은 변경 요청을 조회할 수 있다', async () => {
+    const scheduleRepo = fakeScheduleRepository({
+      findById: vi.fn().mockResolvedValue(SCHEDULE_WITH_MEMBER_PARTICIPANT),
+    });
+    const teamRepo = fakeTeamRepository({
+      findMembership: vi.fn().mockResolvedValue({
+        id: 'm1',
+        teamId: 'team-1',
+        userId: 'u1',
+        role: 'MEMBER',
+        createdAt: '2026-09-09T00:00:00.000Z',
+      }),
+    });
+    const changeRequestRepo = fakeChangeRequestRepository({ listBySchedule: vi.fn().mockResolvedValue([]) });
+
+    const result = await listChangeRequests(scheduleRepo, teamRepo, changeRequestRepo, INPUT);
+
+    expect(result).toEqual([]);
   });
 
   it('팀 구성원이면 제출자가 아니어도(팀장 포함) 해당 일정의 변경 요청 전체를 조회할 수 있다', async () => {

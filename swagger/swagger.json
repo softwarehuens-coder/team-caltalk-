@@ -514,7 +514,7 @@
       "get": {
         "tags": ["Chat"],
         "summary": "일정별 채팅 이력 조회 (UC8)",
-        "description": "커서 기반 페이지네이션으로 시간순 채팅 이력을 조회한다. `canAccessTeamChat` 미통과 시 403, 조회 불가(팀 해체 등으로 일정 자체가 사라진 경우) 시 404. 일정이 소프트 삭제된 경우에도(SC2) 채팅 이력은 정상 조회된다(US-08).",
+        "description": "커서 기반 페이지네이션으로 시간순 채팅 이력을 조회한다. `canAccessScheduleChat` 미통과 시 403(2026-09-18부터 팀장은 항상, 팀원은 해당 일정 참여자여야 통과), 조회 불가(팀 해체 등으로 일정 자체가 사라진 경우) 시 404. 일정이 소프트 삭제된 경우에도(SC2) 채팅 이력은 정상 조회된다(US-08).",
         "operationId": "listScheduleMessages",
         "parameters": [
           { "$ref": "#/components/parameters/ScheduleId" },
@@ -551,7 +551,7 @@
       "post": {
         "tags": ["Chat"],
         "summary": "채팅 메시지 전송 (UC5, 실시간 송신)",
-        "description": "과거 WebSocket(`chat.gateway.ts`, 제거됨)이 담당하던 실시간 송신을 이관한 엔드포인트. `canAccessTeamChat`과 동일한 권한 판단을 재사용한다. 응답으로 저장된 메시지를 그대로 돌려줘, 발신자 자신은 다음 폴링 응답을 기다리지 않고 즉시 화면에 반영할 수 있다.",
+        "description": "과거 WebSocket(`chat.gateway.ts`, 제거됨)이 담당하던 실시간 송신을 이관한 엔드포인트. `canAccessScheduleChat`과 동일한 권한 판단을 재사용한다(2026-09-18부터 팀장은 항상, 팀원은 해당 일정 참여자여야 전송 가능). 응답으로 저장된 메시지를 그대로 돌려줘, 발신자 자신은 다음 폴링 응답을 기다리지 않고 즉시 화면에 반영할 수 있다.",
         "operationId": "sendScheduleMessage",
         "parameters": [
           { "$ref": "#/components/parameters/ScheduleId" }
@@ -584,7 +584,7 @@
       "get": {
         "tags": ["Chat"],
         "summary": "채팅 메시지 롱폴링 수신 (UC5, 실시간 수신)",
-        "description": "과거 WebSocket(`chat.gateway.ts`, 제거됨)이 담당하던 실시간 수신을 REST 롱폴링으로 이관한 엔드포인트. cursor 이후 새 메시지가 생길 때까지 서버가 최대 timeout(ms) 동안 응답을 들고 있다가, 새 메시지가 생기면 즉시 또는 timeout 경과 시 빈 결과로 응답한다. 클라이언트는 응답을 받는 즉시 반환된 데이터의 마지막 createdAt을 다음 cursor로 삼아 다시 요청한다(use-chat-polling.ts). Vercel 서버리스 함수의 최대 실행 시간 내에서 동작하도록 timeout 상한을 둔다.",
+        "description": "과거 WebSocket(`chat.gateway.ts`, 제거됨)이 담당하던 실시간 수신을 REST 롱폴링으로 이관한 엔드포인트. cursor 이후 새 메시지가 생길 때까지 서버가 최대 timeout(ms) 동안 응답을 들고 있다가, 새 메시지가 생기면 즉시 또는 timeout 경과 시 빈 결과로 응답한다. 클라이언트는 응답을 받는 즉시 반환된 데이터의 마지막 createdAt을 다음 cursor로 삼아 다시 요청한다(use-chat-polling.ts). Vercel 서버리스 함수의 최대 실행 시간 내에서 동작하도록 timeout 상한을 둔다. listScheduleMessages(UC8)와 동일한 `canAccessScheduleChat` 판단을 사용한다(2026-09-18부터 팀장은 항상, 팀원은 해당 일정 참여자여야 통과).",
         "operationId": "pollScheduleMessages",
         "parameters": [
           { "$ref": "#/components/parameters/ScheduleId" },
@@ -654,7 +654,7 @@
       "get": {
         "tags": ["ChangeRequests"],
         "summary": "일정별 변경 요청 전체 조회 (상태 무관, UC7 보조)",
-        "description": "BE-7. canAccessTeamChat과 동일하게 팀 소속이면 팀장/팀원 모두 조회 가능. 변경 요청 제출은 WS 브로드캐스트도, 채팅 메시지 기록도 하지 않아(승인/거절 시에만 통지 메시지가 기록됨) 제출자 탭의 로컬 state에만 남아 팀장이 영원히 대기중 요청을 볼 수 없던 버그를 해결하기 위해 추가되었다 — 채팅 패널이 이력 조회와 함께 이 엔드포인트를 호출해 PENDING/APPROVED/REJECTED 요청을 모두 재구성한다.",
+        "description": "BE-7. canAccessScheduleChat과 동일한 권한 판단을 사용한다(2026-09-18부터 팀장은 항상, 팀원은 해당 일정 참여자여야 조회 가능). 변경 요청 제출은 WS 브로드캐스트도, 채팅 메시지 기록도 하지 않아(승인/거절 시에만 통지 메시지가 기록됨) 제출자 탭의 로컬 state에만 남아 팀장이 영원히 대기중 요청을 볼 수 없던 버그를 해결하기 위해 추가되었다 — 채팅 패널이 이력 조회와 함께 이 엔드포인트를 호출해 PENDING/APPROVED/REJECTED 요청을 모두 재구성한다.",
         "operationId": "listChangeRequests",
         "parameters": [
           { "$ref": "#/components/parameters/ScheduleId" }

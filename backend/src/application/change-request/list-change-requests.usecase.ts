@@ -2,7 +2,7 @@ import type { ScheduleRepository } from '../../domain/schedule/schedule.reposito
 import type { TeamRepository } from '../../domain/team/team.repository';
 import type { ChangeRequestRepository } from '../../domain/change-request/change-request.repository';
 import type { ChangeRequest } from '../../domain/change-request/change-request.entity';
-import { canAccessTeamChat } from '../../domain/permission/permission.policy';
+import { canAccessScheduleChat } from '../../domain/permission/permission.policy';
 import { NotFoundError, ForbiddenError } from '../../domain/shared/http-errors';
 
 export interface ListChangeRequestsInput {
@@ -12,7 +12,8 @@ export interface ListChangeRequestsInput {
 
 // 제출자 탭의 로컬 state에만 남는 문제(팀장이 새로고침/재접속 시 대기중 요청을
 // 영원히 볼 수 없는 버그)를 해결하기 위해 추가. list-chat-history.usecase.ts와
-// 동일하게 canAccessTeamChat(팀 소속이면 팀장/팀원 모두 열람 가능)을 사용한다.
+// 동일하게 canAccessScheduleChat(팀장은 항상, 팀원은 해당 일정 참여자여야 열람 가능)을
+// 사용한다.
 export async function listChangeRequests(
   scheduleRepository: ScheduleRepository,
   teamRepository: TeamRepository,
@@ -25,7 +26,8 @@ export async function listChangeRequests(
   }
 
   const membership = await teamRepository.findMembership(schedule.teamId, input.actorUserId);
-  if (!canAccessTeamChat(membership?.role ?? null)) {
+  const isParticipant = schedule.participants.some((p) => p.userId === input.actorUserId);
+  if (!canAccessScheduleChat(membership?.role ?? null, isParticipant)) {
     throw new ForbiddenError('FORBIDDEN', '해당 일정의 변경 요청을 조회할 권한이 없습니다.');
   }
 
