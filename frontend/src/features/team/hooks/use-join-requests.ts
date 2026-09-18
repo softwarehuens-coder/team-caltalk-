@@ -3,6 +3,8 @@ import { ApiError } from '../../../shared/api/api-error';
 import type { TeamJoinRequest, TeamMembership } from '../../../shared/types/team.types';
 import { approveJoinRequest, listJoinRequests } from '../api/team.api';
 
+const JOIN_REQUESTS_POLL_INTERVAL_MS = 5000;
+
 export interface UseJoinRequestsResult {
   requests: TeamJoinRequest[];
   isLoading: boolean;
@@ -40,6 +42,15 @@ export function useJoinRequests(teamId: string | null, enabled: boolean): UseJoi
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // 팀원이 새로 가입 신청을 보내도 팀장 화면이 새로고침 없이 이를 감지하도록 주기적으로 다시 조회한다.
+  useEffect(() => {
+    if (!teamId || !enabled) {
+      return;
+    }
+    const timer = setInterval(() => void refresh(), JOIN_REQUESTS_POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [teamId, enabled, refresh]);
 
   const approve = useCallback(
     async (requestId: string) => {

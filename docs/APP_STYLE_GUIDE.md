@@ -4,9 +4,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.3 |
+| 버전 | v1.4 |
 | 작성일 | 2026-09-10 |
-| 최종수정일 | 2026-09-17 |
+| 최종수정일 | 2026-09-18 |
 | 작성자 | Team CalTalk UI 디자인 |
 | 근거 문서 | 제공된 화면 캡처(대시보드 — 캘린더 + 팀 채팅 화면, 2025년 10월 기준)<br>[8-wireframes.md](./8-wireframes.md) — 구조 와이어프레임(본 문서가 다루는 색상·타이포·여백 등 시각 디자인은 8-wireframes.md 1장(개요)에서 명시적으로 범위 밖으로 남겨둔 부분)<br>[4-project-structure.md](./4-project-structure.md) — 프런트엔드 기술 스택(Vite + React 18 + TypeScript) 및 컴포넌트 인벤토리 |
 
@@ -18,6 +18,7 @@
 | v1.1 | 2026-09-16 | 3.1절 네비게이션 바가 뒤늦게 `AppHeader.tsx`로 구현되면서 함께 만들어진 대시보드 화면(`DashboardPage.tsx`)의 인사말/시계 타이포그래피를 3.5절에 추가(`docs/8-wireframes.md` 2.8절, `docs/7-execution-plan.md` FE-10과 동기화) |
 | v1.2 | 2026-09-16 | 3.5절에 대시보드 일정 카드(미니 캘린더 + 일정 목록)와 내 팀 카드(팀 정보 + 구성원 목록) 마크업 추가 |
 | v1.3 | 2026-09-17 | 3.6절 일정 카드 마크업을 "선택한 날짜의 일정만" 표시하던 것에서 "해당 월 전체 일정을 참여자 이름까지" 표시하도록 갱신, 미니 캘린더의 날짜 선택 스타일 설명 제거 |
+| v1.4 | 2026-09-18 | 3.2절 팀 타이틀 바에서 "🔄 새로고침" 버튼 제거 — `CalendarView.tsx`에 실제 구현된 적이 없던 와이어프레임 잔재였고, `docs/7-execution-plan.md` 10장에서 팀원/일정/변경요청 목록이 5초 폴링으로 자동 갱신되도록 수정되면서 더는 필요하지 않게 됨 |
 
 ---
 
@@ -116,7 +117,6 @@ module.exports = {
     <span class="flex items-center gap-1 text-sm text-gray-500">👥 2</span>
   </div>
   <div class="flex items-center gap-3">
-    <button class="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">🔄 새로고침</button>
     <button class="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">
       + 새 일정
     </button>

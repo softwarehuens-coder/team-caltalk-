@@ -3,6 +3,8 @@ import { ApiError } from '../../../shared/api/api-error';
 import type { TeamMember } from '../../../shared/types/team.types';
 import { getTeamMembers } from '../api/team.api';
 
+const MEMBERS_POLL_INTERVAL_MS = 5000;
+
 export interface UseTeamMembersResult {
   members: TeamMember[];
   isLoading: boolean;
@@ -37,6 +39,15 @@ export function useTeamMembers(teamId: string | null): UseTeamMembersResult {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // 다른 사용자의 가입/탈퇴가 화면에 새로고침 없이 반영되도록 주기적으로 다시 조회한다.
+  useEffect(() => {
+    if (!teamId) {
+      return;
+    }
+    const timer = setInterval(() => void refresh(), MEMBERS_POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [teamId, refresh]);
 
   return { members, isLoading, error, refresh };
 }
