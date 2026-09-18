@@ -2,7 +2,7 @@ import type { ScheduleRepository } from '../../domain/schedule/schedule.reposito
 import type { TeamRepository } from '../../domain/team/team.repository';
 import type { ChatRepository } from '../../domain/chat/chat.repository';
 import type { ChatMessage } from '../../domain/chat/chat-message.entity';
-import { canAccessTeamChat } from '../../domain/permission/permission.policy';
+import { canAccessScheduleChat } from '../../domain/permission/permission.policy';
 import { NotFoundError, ForbiddenError } from '../../domain/shared/http-errors';
 
 export interface SendChatMessageInput {
@@ -13,7 +13,7 @@ export interface SendChatMessageInput {
 
 // UC5(REST POST, chat.routes.ts 경유 — 과거 WebSocket chat.gateway.ts에서 롱폴링
 // 전환으로 이관됨). list-chat-history.usecase.ts(UC8)와 동일한
-// canAccessTeamChat(permission.policy.ts SSOT)을 그대로 재사용한다.
+// canAccessScheduleChat(permission.policy.ts SSOT)을 그대로 재사용한다.
 export async function sendChatMessage(
   scheduleRepository: ScheduleRepository,
   teamRepository: TeamRepository,
@@ -26,7 +26,8 @@ export async function sendChatMessage(
   }
 
   const membership = await teamRepository.findMembership(schedule.teamId, input.actorUserId);
-  if (!canAccessTeamChat(membership?.role ?? null)) {
+  const isParticipant = schedule.participants.some((p) => p.userId === input.actorUserId);
+  if (!canAccessScheduleChat(membership?.role ?? null, isParticipant)) {
     throw new ForbiddenError('FORBIDDEN', '해당 채팅에 접근할 권한이 없습니다.');
   }
 

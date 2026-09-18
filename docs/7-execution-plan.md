@@ -4,11 +4,11 @@
 
 | 항목 | 내용 |
 |---|---|
-| 버전 | v1.6 |
+| 버전 | v1.7 |
 | 작성일 | 2026-09-09 |
 | 최종수정일 | 2026-09-18 |
 | 작성자 | Team CalTalk 실행계획 수립 |
-| 근거 문서 | [1-domain-definition.md](./1-domain-definition.md) (v1.4)<br>[2-PRD.md](./2-PRD.md) (v1.0)<br>[3-User-scenarios.md](./3-User-scenarios.md)<br>[4-project-structure.md](./4-project-structure.md) (v1.5)<br>[5-arch-diagram.md](./5-arch-diagram.md)<br>[6-tech-stack.md](./6-tech-stack.md) (v1.0)<br>[APP_STYLE_GUIDE.md](./APP_STYLE_GUIDE.md) (v1.3) — FE-10 대시보드 화면의 시각 디자인 근거<br>[database/schema.sql](../database/schema.sql) — 데이터 모델의 실질적 근거(구 7-erd.md 대체)<br>[swagger/swagger.json](../swagger/swagger.json) — API 계약의 실질적 근거(v1.1부터 다시 존재 및 유지 중) |
+| 근거 문서 | [1-domain-definition.md](./1-domain-definition.md) (v1.5)<br>[2-PRD.md](./2-PRD.md) (v1.0)<br>[3-User-scenarios.md](./3-User-scenarios.md)<br>[4-project-structure.md](./4-project-structure.md) (v1.5)<br>[5-arch-diagram.md](./5-arch-diagram.md)<br>[6-tech-stack.md](./6-tech-stack.md) (v1.0)<br>[APP_STYLE_GUIDE.md](./APP_STYLE_GUIDE.md) (v1.3) — FE-10 대시보드 화면의 시각 디자인 근거<br>[database/schema.sql](../database/schema.sql) — 데이터 모델의 실질적 근거(구 7-erd.md 대체)<br>[swagger/swagger.json](../swagger/swagger.json) — API 계약의 실질적 근거(v1.1부터 다시 존재 및 유지 중) |
 
 **변경 이력**
 
@@ -21,6 +21,7 @@
 | v1.4 | 2026-09-16 | 사용자 요청(참고 화면 캡처)에 따라 FE-10 대시보드 화면을 확장: 일정 카드(미니 캘린더 + 선택 날짜의 일정 시간/참여인원)와 내 팀 카드(팀 이름/내 가입일/구성원 목록) 추가. 탈퇴일은 `team_memberships`가 탈퇴 시 행을 삭제하는 구조라 저장/표시 대상이 아님을 확인하고 완료조건에 명시(스키마 변경 없이 처리, 사용자 확인 완료). `docs/8-wireframes.md` 2.8절, `docs/APP_STYLE_GUIDE.md` 3.5절과 동기화 |
 | v1.5 | 2026-09-17 | 사용자 요청에 따라 FE-10 일정 카드의 동작을 변경: "날짜를 클릭해야 그 날의 일정만 보인다"는 방식을 없애고, 해당 월에 속한 모든 일정을 항상 목록으로 표시하며 참여 인원 수뿐 아니라 참여자 이름까지 함께 보여주도록 확장(`MiniCalendar.tsx`는 날짜 선택 기능을 제거하고 월 이동 + 일정 유무 점 표시 전용으로 단순화). 같은 요청에 포함되어 있던 "내 팀 카드 반으로 줄이고 팀 채팅 AI 요약 메모란 추가"와 "팀장의 다중 팀 생성 허용"은 검토 후 보류: 전자는 프로젝트에 LLM 연동이 전혀 없고(백엔드 `.env`/`package.json`에 Anthropic·OpenAI 등 부재) API 키·비용·캐싱 정책이 확정되지 않아 사용자가 명시적으로 이번 범위에서 제외했고, 후자도 사용자가 이번 범위에서 제외함(백엔드/DB에는 애초에 "팀당 팀장 1명" 제약만 있고 "팀장당 팀 1개" 제약은 없어 필요해지면 프론트만 수정하면 됨 — 도메인정의서 4장 참조). `docs/8-wireframes.md` 2.8절, `docs/APP_STYLE_GUIDE.md` 3.6절과 동기화 |
 | v1.6 | 2026-09-18 | 사용자가 "팀 가입 승인/팀 일정 생성/채팅 변경요청 승인이 새로고침해야만 반영된다"고 보고해 발견된 갭을 "10. 2026-09-18 발견된 갭" 절로 신설. `use-team-members.ts`/`use-join-requests.ts`/`use-team-schedules.ts`/`ScheduleChatPanel.tsx`에 5초 간격 폴링 추가(WebSocket 재도입 없이 4장 원칙 유지). |
+| v1.7 | 2026-09-18 | 같은 날 후속 세션에서 사용자 요청에 따라 "11. 2026-09-18 세션 후반부" 절 신설: (1) v1.6의 5초 자동 폴링을 사용자 요청으로 되돌려 새로고침 기반 조회로 복원(`use-team-members.ts`/`use-join-requests.ts`/`use-team-schedules.ts`/`ScheduleChatPanel.tsx`), (2) 팀원이 자신이 참여자로 등록되지 않은 일정의 채팅까지 읽고 쓸 수 있던 문제를 발견해 "일정 채팅 접근은 참여자(팀장은 항상 예외)로 제한"하는 도메인 정책 변경 — `docs/1-domain-definition.md` v1.5(4장), `permission.policy.ts`의 `canAccessScheduleChat`, 프론트 `CalendarView.tsx` 입장 차단, `swagger/swagger.json` 동기화. |
 
 ## 0. 개요
 
@@ -695,3 +696,58 @@ BE-1~BE-10, FE-0~FE-9 구현이 모두 끝난 뒤, 유닛 테스트(백엔드 10
 감지하는가"가 매 기능마다 개별적으로 챙겨야 하는 상시 리스크임이 다시 확인됐다. 이 프로젝트는 Vercel
 서버리스 배포 제약상 WebSocket을 배제하기로 이미 결정했으므로(4장), 향후 유사한 갭은 기본적으로 이번과
 같은 짧은 간격의 REST 폴링을 표준 해결 패턴으로 삼는다.
+
+---
+
+## 11. 2026-09-18 세션 후반부 — 자동 폴링 복원 요청 + 일정 채팅 접근 범위 축소
+
+같은 날 이어진 후속 세션에서 사용자가 두 가지를 요청했다.
+
+### (1) 10장의 5초 자동 폴링을 새로고침 방식으로 복원
+
+10장에서 추가한 4곳의 5초 간격 폴링(`use-team-members.ts`/`use-join-requests.ts`/
+`use-team-schedules.ts`/`ScheduleChatPanel.tsx` 대기중 변경요청)을 사용자 요청에 따라 되돌렸다.
+마운트 시 1회 조회 후 각 화면의 `refresh()`를 수동으로 호출해야 갱신되는 이전 동작으로 복원했다
+(`JoinTeamForm.tsx`의 가입 승인 자동 감지 폴링과 채팅 메시지 자체의 롱폴링(`use-chat-polling.ts`)은
+10장 이전부터 있던 별개 기능이라 그대로 유지된다).
+
+### (2) 일정 채팅 접근 범위를 "팀 소속"에서 "참여자(+팀장)"로 축소
+
+**발견 경위**: 사용자가 실사용 중 "일정 채팅 참여자가 아닌데도 그 일정 채팅에 입장해서 읽기·쓰기가
+모두 가능하다"는 점을 보고했다. 확인 결과 이는 버그가 아니라 `docs/1-domain-definition.md`(v1.4까지)
+4장에 명시된 의도된 설계였다 — "팀장과 팀원 모두 자신이 속한 팀의 일정 채팅에 메시지를 자유롭게
+작성·열람할 수 있다"는 문장과 `permission.policy.ts`의 `canAccessTeamChat(role)`(역할만 확인, 참여자
+여부는 보지 않음)이 정확히 일치했다. 다만 사용자가 이 설계를 실사용 관점에서 바람직하지 않다고 판단해
+정책 변경을 요청했다.
+
+**정책 변경 내용**: 일정 채팅 접근을 "그 일정의 참여자인가"로 좁히되, 팀장은 예외로 둔다 — 팀장은
+일정 생성 시 스스로를 참여자로 넣지 않는 경우가 흔하고(참여자 지정은 `ScheduleForm.tsx`에서 자유롭게
+선택), 모든 일정의 변경 요청 승인/거절(UC7)을 위해 모든 일정 채팅에 들어갈 수 있어야 하므로 팀장은
+참여자 여부와 무관하게 항상 접근 가능하게 유지했다(4장 표·SSOT 문장 갱신).
+
+**구현**:
+- `docs/1-domain-definition.md` v1.5, 4장: 권한 표에 "일정 채팅 접근" 열 추가, SSOT 문장을
+  "팀장은 항상 / 팀원은 참여자인 경우에만"으로 교체
+- `backend/src/domain/permission/permission.policy.ts`: `canAccessTeamChat(role)`를
+  `canAccessScheduleChat(role, isParticipant)`로 교체(팀장 `true` 고정, 팀원은 참여자 여부를 그대로
+  반환, 그 외 `false`)
+- 이 함수를 사용하는 4개 유스케이스 모두 `schedule.participants`에서 참여자 여부를 계산해 함께
+  넘기도록 수정: `list-chat-history.usecase.ts`(UC8), `poll-chat-messages.usecase.ts`(UC5 롱폴링),
+  `send-chat-message.usecase.ts`(UC5 전송), `list-change-requests.usecase.ts`(BE-7 보조 조회)
+- `swagger/swagger.json`의 관련 엔드포인트 설명(`listScheduleMessages`/`pollScheduleMessages`/
+  `sendScheduleMessage`/`listChangeRequests`)을 새 규칙으로 갱신하고 `backend/swagger/swagger.json`
+  빌드 복사본도 재생성
+- 프론트 `CalendarView.tsx`: 캘린더 칩 클릭(`handleScheduleClick`)이 유일한 채팅 패널 진입 지점이므로,
+  여기서 팀원이면서 참여자가 아닌 경우 `ScheduleChatPanel`을 열지 않고 "참여자로 등록된 일정만 채팅에
+  입장할 수 있습니다" 안내만 띄우도록 차단(백엔드 403은 devtools로 API를 직접 호출하는 경로에 대한
+  방어이고, 정상 경로의 UX는 이 프론트 차단이 담당)
+
+관련 단위 테스트(`permission.policy.test.ts`, 4개 유스케이스 테스트, `CalendarView.test.tsx`)를 새
+규칙에 맞춰 갱신·추가했다.
+
+**시사점**: 4장이 "권한 규칙의 SSOT"라고 스스로 선언하고 있었음에도, 코드(`permission.policy.ts`)가
+그 SSOT를 정확히 반영하고 있었기 때문에 이번 변경은 "버그 수정"이 아니라 "이미 문서화된 설계를
+사용자 피드백에 따라 의도적으로 바꾼 것"이다. 문서·코드가 서로 어긋나 있었다면 무엇을 기준으로
+고칠지 판단이 필요했겠지만, 이번처럼 둘이 정확히 일치하는 상태에서 설계 자체를 바꿀 때는 반드시
+SSOT 문서(4장)를 먼저 갱신한 뒤 이를 인용하는 나머지 계층(정책 함수 → 유스케이스 → swagger.json →
+프론트 진입점)을 순서대로 맞추는 것이 드리프트를 막는다.

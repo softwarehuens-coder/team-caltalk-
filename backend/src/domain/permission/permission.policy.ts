@@ -43,8 +43,16 @@ export function canSubmitChangeRequest(role: TeamRole | null): boolean {
   return role === 'MEMBER';
 }
 
-// UC5, UC8, 4장 — 채팅 접근은 역할과 무관하게 팀 소속 여부만으로 결정되는 단순 규칙이다
-// (팀장/팀원 모두 자유롭게 작성·열람 가능).
-export function canAccessTeamChat(role: TeamRole | null): boolean {
-  return role === 'LEADER' || role === 'MEMBER';
+// UC5, UC8, 4장(2026-09-18 정책 변경, docs/7-execution-plan.md 11장 참조) — 채팅 접근은
+// 더는 팀 소속 여부만으로 결정되지 않는다. 팀장은 모든 일정을 관리하고 변경요청도
+// 승인/거절해야 하므로 참여자 여부와 무관하게 항상 접근 가능하지만, 팀원은 해당
+// 일정의 참여자로 등록되어 있어야만 그 일정 채팅에 읽기/쓰기 접근할 수 있다.
+export function canAccessScheduleChat(role: TeamRole | null, isParticipant: boolean): boolean {
+  if (role === 'LEADER') {
+    return true;
+  }
+  if (role === 'MEMBER') {
+    return isParticipant;
+  }
+  return false;
 }

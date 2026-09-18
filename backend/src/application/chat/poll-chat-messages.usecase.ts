@@ -2,7 +2,7 @@ import type { ScheduleRepository } from '../../domain/schedule/schedule.reposito
 import type { TeamRepository } from '../../domain/team/team.repository';
 import type { ChatRepository } from '../../domain/chat/chat.repository';
 import type { PaginatedChatMessages } from '../../domain/chat/chat-message.entity';
-import { canAccessTeamChat } from '../../domain/permission/permission.policy';
+import { canAccessScheduleChat } from '../../domain/permission/permission.policy';
 import { NotFoundError, ForbiddenError } from '../../domain/shared/http-errors';
 
 export interface PollChatMessagesInput {
@@ -23,7 +23,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 // UC5를 WebSocket 대신 롱폴링으로 구현한다(Vercel 서버리스 배포 호환 목적, 이슈
-// 롱폴링 전환 논의). listChatHistory(UC8)와 동일한 canAccessTeamChat 권한 판단을
+// 롱폴링 전환 논의). listChatHistory(UC8)와 동일한 canAccessScheduleChat 권한 판단을
 // 재사용하고, 새 메시지가 생길 때까지 timeoutMs 동안 chatRepository.listMessages를
 // 짧은 간격으로 재호출하다 새 메시지가 있으면 즉시, 없으면 빈 결과로 응답한다 —
 // 클라이언트는 응답을 받는 즉시 반환된 커서로 다시 요청하는 방식으로 동작한다.
@@ -39,7 +39,8 @@ export async function pollChatMessages(
   }
 
   const membership = await teamRepository.findMembership(schedule.teamId, input.actorUserId);
-  if (!canAccessTeamChat(membership?.role ?? null)) {
+  const isParticipant = schedule.participants.some((p) => p.userId === input.actorUserId);
+  if (!canAccessScheduleChat(membership?.role ?? null, isParticipant)) {
     throw new ForbiddenError('FORBIDDEN', '해당 채팅에 접근할 권한이 없습니다.');
   }
 

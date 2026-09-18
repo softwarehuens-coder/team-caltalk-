@@ -51,7 +51,14 @@ export function CalendarView({ onScheduleClick }: CalendarViewProps) {
   const isLeader = currentMember?.role === 'LEADER';
   const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId) ?? null;
 
+  // 2026-09-18 정책 변경(docs/1-domain-definition.md 4장): 팀장은 항상 모든 일정 채팅에
+  // 입장 가능하지만, 팀원은 해당 일정의 참여자로 등록되어 있어야만 입장할 수 있다.
   const handleScheduleClick = (schedule: Schedule): void => {
+    const isParticipant = schedule.participants.some((participant) => participant.userId === user?.id);
+    if (!isLeader && !isParticipant) {
+      window.alert('참여자로 등록된 일정만 채팅에 입장할 수 있습니다.');
+      return;
+    }
     setSelectedScheduleId(schedule.id);
     onScheduleClick?.(schedule);
   };
