@@ -13,7 +13,9 @@ const SCHEDULE = {
   endAt: '2026-09-09T01:00:00.000Z',
   createdAt: '2026-09-09T00:00:00.000Z',
   deletedAt: null,
-  participants: [{ id: 'p1', scheduleId: 's1', userId: 'u1', createdAt: '2026-09-09T00:00:00.000Z' }],
+  participants: [
+    { id: 'p1', scheduleId: 's1', userId: 'u1', createdAt: '2026-09-09T00:00:00.000Z' },
+  ],
 };
 const INPUT = { scheduleId: 's1', actorUserId: 'u1', content: '안녕하세요' };
 
@@ -36,7 +38,9 @@ describe('sendChatMessage', () => {
 
   it('2026-09-18 정책 변경: 팀원이지만 해당 일정 참여자가 아니면 ForbiddenError', async () => {
     const scheduleWithoutActor = { ...SCHEDULE, participants: [] };
-    const scheduleRepo = fakeScheduleRepository({ findById: vi.fn().mockResolvedValue(scheduleWithoutActor) });
+    const scheduleRepo = fakeScheduleRepository({
+      findById: vi.fn().mockResolvedValue(scheduleWithoutActor),
+    });
     const teamRepo = fakeTeamRepository({
       findMembership: vi.fn().mockResolvedValue({
         id: 'm1',
@@ -54,7 +58,9 @@ describe('sendChatMessage', () => {
 
   it('팀장은 해당 일정 참여자가 아니어도 메시지를 보낼 수 있다', async () => {
     const scheduleWithoutActor = { ...SCHEDULE, participants: [] };
-    const scheduleRepo = fakeScheduleRepository({ findById: vi.fn().mockResolvedValue(scheduleWithoutActor) });
+    const scheduleRepo = fakeScheduleRepository({
+      findById: vi.fn().mockResolvedValue(scheduleWithoutActor),
+    });
     const teamRepo = fakeTeamRepository({
       findMembership: vi.fn().mockResolvedValue({
         id: 'm1',

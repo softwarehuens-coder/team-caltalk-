@@ -18,7 +18,9 @@ const SCHEDULE = {
 
 const SCHEDULE_WITH_MEMBER_PARTICIPANT = {
   ...SCHEDULE,
-  participants: [{ id: 'p1', scheduleId: 's1', userId: 'u1', createdAt: '2026-09-09T00:00:00.000Z' }],
+  participants: [
+    { id: 'p1', scheduleId: 's1', userId: 'u1', createdAt: '2026-09-09T00:00:00.000Z' },
+  ],
 };
 
 const INPUT = { scheduleId: 's1', actorUserId: 'u1' };
@@ -71,7 +73,9 @@ describe('listChangeRequests', () => {
         createdAt: '2026-09-09T00:00:00.000Z',
       }),
     });
-    const changeRequestRepo = fakeChangeRequestRepository({ listBySchedule: vi.fn().mockResolvedValue([]) });
+    const changeRequestRepo = fakeChangeRequestRepository({
+      listBySchedule: vi.fn().mockResolvedValue([]),
+    });
 
     const result = await listChangeRequests(scheduleRepo, teamRepo, changeRequestRepo, INPUT);
 
